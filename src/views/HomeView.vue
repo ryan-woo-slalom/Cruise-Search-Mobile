@@ -171,21 +171,41 @@ function openQuickView(cruiseSet: CruiseDeparture[], title: string): void {
 </script>
 
 <template>
-  <v-container fluid class="pa-4 pa-md-8 cruise-page">
-    <v-card class="hero-card mb-6" rounded="xl">
-      <v-card-text class="py-8 py-md-10 px-6 px-md-10">
-        <p class="text-overline text-medium-emphasis">Cruise Search</p>
-        <h1 class="text-h4 text-md-h3 font-weight-bold mb-2">Find your perfect Intrepid voyage</h1>
-        <p class="text-body-1 text-medium-emphasis mb-0">
-          Mobile-first search with real-time filters, itinerary and date views, and quick booking actions.
+  <v-container fluid class="pa-3 pa-sm-5 pa-md-8 cruise-page">
+    <v-card class="hero-card mb-5 mb-md-6" rounded="xl" elevation="0">
+      <v-card-text class="py-8 py-md-9 px-5 px-md-9">
+        <div class="d-flex align-center ga-2 mb-3">
+          <v-chip color="primary" size="small" variant="tonal">Cruise Search</v-chip>
+          <v-chip color="secondary" size="small" variant="tonal">Jul-Dec 2027</v-chip>
+        </div>
+        <h1 class="text-h4 text-md-h3 font-weight-black mb-2 hero-title">Find your perfect Intrepid voyage</h1>
+        <p class="text-body-1 text-medium-emphasis mb-4 hero-copy">
+          Search itineraries, compare sail dates, and estimate room pricing in seconds.
         </p>
+        <v-row>
+          <v-col cols="4">
+            <div class="hero-stat-label">Itineraries</div>
+            <div class="hero-stat-value">{{ groupedByItinerary.length }}</div>
+          </v-col>
+          <v-col cols="4">
+            <div class="hero-stat-label">Cruise Dates</div>
+            <div class="hero-stat-value">{{ filteredCruises.length }}</div>
+          </v-col>
+          <v-col cols="4">
+            <div class="hero-stat-label">Saved</div>
+            <div class="hero-stat-value">{{ savedIds.length }}</div>
+          </v-col>
+        </v-row>
       </v-card-text>
     </v-card>
 
-    <v-row>
+    <v-row class="align-start">
       <v-col cols="12" md="3">
-        <v-card v-if="mdAndUp" rounded="lg" class="sticky-filters">
-          <v-card-title>Filters</v-card-title>
+        <v-card v-if="mdAndUp" rounded="xl" class="sticky-filters filters-shell surface-card" elevation="2">
+          <v-card-title class="d-flex align-center ga-2 py-4">
+            <v-icon icon="mdi-tune-variant" color="primary" />
+            Filters
+          </v-card-title>
           <v-divider />
           <v-card-text>
             <CruiseFilters
@@ -206,28 +226,34 @@ function openQuickView(cruiseSet: CruiseDeparture[], title: string): void {
       </v-col>
 
       <v-col cols="12" md="9">
-        <div class="d-flex flex-wrap align-center ga-3 mb-4">
+        <v-card rounded="xl" elevation="2" class="toolbar-shell mb-4 surface-card">
+          <v-card-text class="py-3 px-3 px-sm-4 d-flex flex-wrap align-center ga-3">
           <v-btn
             v-if="!mdAndUp"
             color="primary"
             prepend-icon="mdi-filter-variant"
+            rounded="pill"
             @click="mobileFiltersOpen = true"
           >
             Filters
           </v-btn>
 
-          <v-btn-toggle v-model="activeView" mandatory color="primary" divided>
+          <v-btn-toggle v-model="activeView" mandatory color="primary" divided rounded="pill">
             <v-btn value="itinerary">View by Itinerary</v-btn>
             <v-btn value="date">View by Cruise Date</v-btn>
           </v-btn-toggle>
 
-          <v-chip color="secondary" variant="tonal">
+          <v-chip color="secondary" variant="tonal" prepend-icon="mdi-ferry">
             {{ filteredCruises.length }} cruise dates found
           </v-chip>
-        </div>
+          </v-card-text>
+        </v-card>
 
-        <v-card rounded="lg" class="mb-6">
-          <v-card-title class="pb-0">Pricing trend</v-card-title>
+        <v-card rounded="xl" class="mb-6 pricing-shell surface-card" elevation="2">
+          <v-card-title class="pt-5 pb-1 d-flex align-center ga-2">
+            <v-icon icon="mdi-chart-line" color="primary" />
+            Pricing trend
+          </v-card-title>
           <v-card-text>
             <PriceTrendChart :cruises="filteredCruises" />
           </v-card-text>
@@ -235,27 +261,39 @@ function openQuickView(cruiseSet: CruiseDeparture[], title: string): void {
 
         <v-row v-if="activeView === 'itinerary'">
           <v-col v-for="group in groupedByItinerary" :key="group.itineraryName" cols="12">
-            <v-card rounded="lg" class="mb-3">
-              <v-card-text>
+            <v-card rounded="xl" class="mb-4 itinerary-card surface-card" elevation="2">
+              <v-card-text class="pa-4 pa-sm-5">
                 <div class="d-flex justify-space-between flex-wrap ga-3">
                   <div>
-                    <h2 class="text-h6 mb-1">{{ group.itineraryName }}</h2>
-                    <p class="text-body-2 mb-1">{{ group.itineraryMap }}</p>
-                    <p class="text-body-2 text-medium-emphasis mb-0">
-                      {{ group.shipName }} | {{ group.leadDeparture.nights }} nights | from
+                    <div class="d-flex align-center ga-2 mb-2">
+                      <v-icon icon="mdi-map-marker-path" color="primary" size="18" />
+                      <h2 class="text-h6 mb-0">{{ group.itineraryName }}</h2>
+                    </div>
+                    <p class="text-body-2 mb-2 route-copy">{{ group.itineraryMap }}</p>
+                    <p class="text-body-2 text-medium-emphasis mb-0 compact-meta">
+                      {{ group.shipName }}
+                      <span class="mx-1">•</span>
+                      {{ group.leadDeparture.nights }} nights
+                      <span class="mx-1">•</span>
+                      from
                       {{ formatCurrency(Math.min(...group.departures.map((item) => item.pricePerPerson))) }} / guest
                     </p>
                   </div>
-                  <div class="d-flex flex-wrap ga-2 align-start justify-end">
+                    <div class="d-flex flex-wrap ga-2 align-start justify-end card-actions">
                     <v-btn
                       size="small"
-                      variant="tonal"
+                      variant="outlined"
                       :color="savedIds.includes(group.leadDeparture.id) ? 'secondary' : undefined"
                       @click="toggleSaved(group.leadDeparture.id)"
                     >
                       {{ savedIds.includes(group.leadDeparture.id) ? 'Saved' : 'Save' }}
                     </v-btn>
-                    <v-btn size="small" variant="tonal" @click="toggleCompare(group.leadDeparture.id)">
+                    <v-btn
+                      size="small"
+                      variant="tonal"
+                      :color="compareIds.includes(group.leadDeparture.id) ? 'secondary' : undefined"
+                      @click="toggleCompare(group.leadDeparture.id)"
+                    >
                       Compare
                     </v-btn>
                     <v-btn
@@ -266,17 +304,19 @@ function openQuickView(cruiseSet: CruiseDeparture[], title: string): void {
                     >
                       Quick view
                     </v-btn>
-                    <v-btn size="small" color="primary" href="#">Book now</v-btn>
+                    <v-btn size="small" color="primary" href="#" rounded="pill">Book now</v-btn>
                   </div>
                 </div>
 
-                <v-expansion-panels variant="accordion" class="mt-4">
-                  <v-expansion-panel title="Show available cruise dates">
+                <v-expansion-panels variant="accordion" class="mt-4 itinerary-expansion" flat>
+                  <v-expansion-panel rounded="lg" title="Show available cruise dates">
                     <v-expansion-panel-text>
                       <v-row>
                         <v-col v-for="departure in group.departures" :key="departure.id" cols="12" sm="6">
-                          <v-sheet color="blue-lighten-5" rounded="lg" class="pa-3">
-                            <div class="text-subtitle-2">{{ formatDate(departure.startDate) }} to {{ formatDate(departure.endDate) }}</div>
+                          <v-sheet rounded="lg" class="pa-3 departure-chip">
+                            <div class="text-subtitle-2 mb-1">
+                              {{ formatDate(departure.startDate) }} to {{ formatDate(departure.endDate) }}
+                            </div>
                             <div class="text-caption">Starting at {{ formatCurrency(departure.pricePerPerson) }} per person</div>
                           </v-sheet>
                         </v-col>
@@ -291,20 +331,20 @@ function openQuickView(cruiseSet: CruiseDeparture[], title: string): void {
 
         <v-row v-else>
           <v-col v-for="cruise in filteredCruises" :key="cruise.id" cols="12" sm="6">
-            <v-card rounded="lg" class="fill-height">
-              <v-card-text>
+            <v-card rounded="xl" class="fill-height cruise-date-card surface-card" elevation="2">
+              <v-card-text class="pa-4 pa-sm-5">
                 <div class="d-flex justify-space-between ga-3">
                   <div>
-                    <h2 class="text-subtitle-1 font-weight-bold mb-1">{{ cruise.itineraryName }}</h2>
+                    <h2 class="text-subtitle-1 font-weight-bold mb-1 card-title">{{ cruise.itineraryName }}</h2>
                     <p class="text-body-2 mb-1">{{ cruise.shipName }}</p>
-                    <p class="text-caption text-medium-emphasis mb-2">{{ cruise.itineraryMap }}</p>
+                    <p class="text-caption text-medium-emphasis mb-2 route-copy">{{ cruise.itineraryMap }}</p>
                     <p class="text-body-2 mb-0">
                       {{ formatDate(cruise.startDate) }} to {{ formatDate(cruise.endDate) }}
                     </p>
                   </div>
                   <div class="text-right">
-                    <div class="text-h6">{{ formatCurrency(cruise.pricePerPerson) }}</div>
-                    <div class="text-caption">per person</div>
+                    <v-chip color="primary" variant="flat" size="small">{{ formatCurrency(cruise.pricePerPerson) }}</v-chip>
+                    <div class="text-caption mt-1">per person</div>
                   </div>
                 </div>
 
@@ -313,32 +353,42 @@ function openQuickView(cruiseSet: CruiseDeparture[], title: string): void {
                 <v-row dense>
                   <v-col cols="6">
                     <div class="text-caption">Interior</div>
-                    <div class="text-body-2">{{ formatCurrency(cruise.stateroomPricing.interior) }}</div>
+                    <div class="text-body-2 font-weight-medium">{{ formatCurrency(cruise.stateroomPricing.interior) }}</div>
                   </v-col>
                   <v-col cols="6">
                     <div class="text-caption">Balcony</div>
-                    <div class="text-body-2">{{ formatCurrency(cruise.stateroomPricing.balcony) }}</div>
+                    <div class="text-body-2 font-weight-medium">{{ formatCurrency(cruise.stateroomPricing.balcony) }}</div>
                   </v-col>
                 </v-row>
               </v-card-text>
 
-              <v-card-actions>
-                <v-btn size="small" variant="tonal" @click="toggleSaved(cruise.id)">
+              <v-card-actions class="px-4 pb-4 pt-0 px-sm-5 pb-sm-5">
+                <v-btn size="small" variant="outlined" @click="toggleSaved(cruise.id)">
                   {{ savedIds.includes(cruise.id) ? 'Saved' : 'Save' }}
                 </v-btn>
-                <v-btn size="small" variant="tonal" @click="toggleCompare(cruise.id)">Compare</v-btn>
+                <v-btn
+                  size="small"
+                  variant="tonal"
+                  :color="compareIds.includes(cruise.id) ? 'secondary' : undefined"
+                  @click="toggleCompare(cruise.id)"
+                >
+                  Compare
+                </v-btn>
                 <v-spacer />
                 <v-btn size="small" variant="outlined" @click="openQuickView([cruise], cruise.itineraryName)">
                   Quick view
                 </v-btn>
-                <v-btn size="small" color="primary" href="#">Book now</v-btn>
+                <v-btn size="small" color="primary" href="#" rounded="pill">Book now</v-btn>
               </v-card-actions>
             </v-card>
           </v-col>
         </v-row>
 
-        <v-card v-if="compareCruises.length > 0" rounded="lg" class="mt-6">
-          <v-card-title>Compare cruises ({{ compareCruises.length }}/3)</v-card-title>
+        <v-card v-if="compareCruises.length > 0" rounded="xl" class="mt-6 compare-shell surface-card" elevation="2">
+          <v-card-title class="d-flex align-center ga-2">
+            <v-icon icon="mdi-compare" color="secondary" />
+            Compare cruises ({{ compareCruises.length }}/3)
+          </v-card-title>
           <v-divider />
           <v-table density="comfortable">
             <thead>
@@ -363,8 +413,8 @@ function openQuickView(cruiseSet: CruiseDeparture[], title: string): void {
     </v-row>
 
     <v-dialog v-model="mobileFiltersOpen" fullscreen>
-      <v-card>
-        <v-toolbar color="white">
+      <v-card class="mobile-filter-shell">
+        <v-toolbar color="white" elevation="0">
           <v-toolbar-title>Filters</v-toolbar-title>
           <v-spacer />
           <v-btn icon="mdi-close" variant="text" @click="mobileFiltersOpen = false" />
@@ -388,7 +438,7 @@ function openQuickView(cruiseSet: CruiseDeparture[], title: string): void {
     </v-dialog>
 
     <v-dialog v-model="quickViewOpen" max-width="900">
-      <v-card>
+      <v-card rounded="xl" class="quick-view-shell surface-card">
         <v-card-title class="d-flex align-center justify-space-between">
           <span>{{ quickViewTitle }}</span>
           <v-btn icon="mdi-close" variant="text" @click="quickViewOpen = false" />
@@ -414,7 +464,7 @@ function openQuickView(cruiseSet: CruiseDeparture[], title: string): void {
             </v-col>
 
             <v-col cols="12" md="5">
-              <v-sheet color="blue-lighten-5" rounded="lg" class="pa-4">
+              <v-sheet rounded="lg" class="pa-4 calculator-shell">
                 <h3 class="text-subtitle-1 font-weight-bold mb-3">Guest calculator</h3>
                 <v-select
                   v-model="selectedStateroomType"
@@ -464,18 +514,105 @@ function openQuickView(cruiseSet: CruiseDeparture[], title: string): void {
 
 <style scoped>
 .cruise-page {
-  background:
-    radial-gradient(circle at top right, rgba(151, 207, 255, 0.26), transparent 34%),
-    linear-gradient(180deg, #f7fbff 0%, #edf5fb 100%);
+  background: linear-gradient(180deg, #f8fbff 0%, #eef4fb 100%);
 }
 
 .hero-card {
-  background: linear-gradient(130deg, #ffffff 0%, #e4f1ff 100%);
-  border: 1px solid #cde2f4;
+  background: linear-gradient(145deg, #ffffff 0%, #eef6ff 100%);
+  border: 1px solid #d3e3f3;
+  box-shadow: 0 10px 28px rgba(22, 67, 110, 0.1);
+  color: #13395f;
+}
+
+.hero-copy {
+  max-width: 58ch;
+  color: #3e6287 !important;
+}
+
+.hero-title {
+  letter-spacing: 0.01em;
+  color: #123c66;
+}
+
+.hero-stat-label {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #4a6f94;
+  font-weight: 700;
+}
+
+.hero-stat-value {
+  font-size: 1.35rem;
+  font-weight: 800;
+  color: #103a61;
 }
 
 .sticky-filters {
   position: sticky;
   top: 88px;
+}
+
+.filters-shell,
+.toolbar-shell,
+.pricing-shell,
+.compare-shell,
+.itinerary-card,
+.cruise-date-card,
+.quick-view-shell {
+  border: 1px solid #d8e5f1;
+  background: #ffffff;
+  box-shadow: 0 6px 16px rgba(19, 67, 108, 0.05);
+}
+
+.surface-card {
+  border: 1px solid #cfdfee;
+  box-shadow: 0 10px 22px rgba(24, 79, 126, 0.08);
+}
+
+.toolbar-shell {
+  background: #ffffff;
+}
+
+.route-copy {
+  color: #28557f;
+}
+
+.compact-meta {
+  line-height: 1.45;
+}
+
+.card-actions {
+  min-width: 315px;
+}
+
+.itinerary-expansion {
+  border: 1px solid #dee8f3;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.departure-chip {
+  background: #f6faff;
+  border: 1px solid #dce8f4;
+}
+
+.card-title {
+  color: #103a61;
+}
+
+.mobile-filter-shell {
+  background: linear-gradient(180deg, #f9fcff 0%, #f1f6fc 100%);
+}
+
+.calculator-shell {
+  background: #f5f9ff;
+  border: 1px solid #d5e4f3;
+}
+
+@media (max-width: 600px) {
+  .card-actions {
+    min-width: unset;
+  }
 }
 </style>

@@ -43,13 +43,14 @@ const chartData = computed(() => {
       {
         label: 'Average Price Per Person',
         data: monthAverages,
-        borderColor: '#0b4f8a',
-        backgroundColor: 'rgba(30, 136, 229, 0.18)',
+        borderColor: '#135f9c',
+        backgroundColor: 'rgba(68, 153, 225, 0.22)',
         tension: 0.35,
         fill: true,
         pointBackgroundColor: '#ffffff',
-        pointBorderColor: '#0b4f8a',
+        pointBorderColor: '#135f9c',
         pointBorderWidth: 2,
+        pointRadius: 4,
       },
     ],
   }
@@ -62,12 +63,20 @@ const chartOptions = {
     legend: {
       display: true,
       labels: {
-        color: '#12365b',
+        color: '#1e4568',
       },
     },
   },
   scales: {
+    x: {
+      grid: {
+        display: false,
+      },
+    },
     y: {
+      grid: {
+        color: 'rgba(19, 95, 156, 0.12)',
+      },
       ticks: {
         callback(value: string | number) {
           return `$${value}`
@@ -87,5 +96,9 @@ const chartOptions = {
 <style scoped>
 .chart-wrap {
   min-height: 240px;
+  border: 1px solid #d7e7f5;
+  border-radius: 14px;
+  padding: 12px;
+  background: #ffffff;
 }
 </style>

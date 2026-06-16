@@ -16,64 +16,86 @@ const nightsRange = defineModel<number[]>('nightsRange', { required: true })
 </script>
 
 <template>
-  <div class="d-flex flex-column ga-4">
-    <v-text-field
-      v-model="searchQuery"
-      label="Search itinerary or ship"
-      prepend-inner-icon="mdi-magnify"
-      variant="outlined"
-      hide-details
-      density="comfortable"
-    />
+  <v-expansion-panels variant="accordion" class="filter-accordion">
+    <v-expansion-panel title="Search">
+      <v-expansion-panel-text>
+        <v-text-field
+          v-model="searchQuery"
+          label="Search itinerary or ship"
+          prepend-inner-icon="mdi-magnify"
+          variant="outlined"
+          hide-details
+          density="comfortable"
+        />
+      </v-expansion-panel-text>
+    </v-expansion-panel>
 
-    <v-select
-      v-model="selectedMonths"
-      :items="monthOptions"
-      item-title="label"
-      item-value="value"
-      label="Departure month"
-      variant="outlined"
-      multiple
-      chips
-      closable-chips
-      hide-details
-    />
+    <v-expansion-panel title="Sailing month">
+      <v-expansion-panel-text>
+        <v-select
+          v-model="selectedMonths"
+          :items="monthOptions"
+          item-title="label"
+          item-value="value"
+          label="Departure month"
+          variant="outlined"
+          multiple
+          chips
+          closable-chips
+          hide-details
+        />
+      </v-expansion-panel-text>
+    </v-expansion-panel>
 
-    <v-select
-      v-model="selectedShips"
-      :items="shipOptions"
-      label="Ship"
-      variant="outlined"
-      multiple
-      chips
-      closable-chips
-      hide-details
-    />
+    <v-expansion-panel title="Ship">
+      <v-expansion-panel-text>
+        <v-select
+          v-model="selectedShips"
+          :items="shipOptions"
+          label="Ship"
+          variant="outlined"
+          multiple
+          chips
+          closable-chips
+          hide-details
+        />
+      </v-expansion-panel-text>
+    </v-expansion-panel>
 
-    <div>
-      <p class="text-caption text-medium-emphasis mb-1">Price per person</p>
-      <v-range-slider
-        v-model="priceRange"
-        :min="minPrice"
-        :max="maxPrice"
-        :step="10"
-        color="primary"
-        thumb-label="always"
-        hide-details
-      />
-    </div>
+    <v-expansion-panel title="Price per person">
+      <v-expansion-panel-text>
+        <v-range-slider
+          v-model="priceRange"
+          :min="minPrice"
+          :max="maxPrice"
+          :step="10"
+          color="primary"
+          thumb-label="always"
+          hide-details
+        />
+      </v-expansion-panel-text>
+    </v-expansion-panel>
 
-    <div>
-      <p class="text-caption text-medium-emphasis mb-1">Cruise nights</p>
-      <v-range-slider
-        v-model="nightsRange"
-        :min="minNights"
-        :max="maxNights"
-        :step="1"
-        color="primary"
-        thumb-label="always"
-        hide-details
-      />
-    </div>
-  </div>
+    <v-expansion-panel title="Cruise nights">
+      <v-expansion-panel-text>
+        <v-range-slider
+          v-model="nightsRange"
+          :min="minNights"
+          :max="maxNights"
+          :step="1"
+          color="primary"
+          thumb-label="always"
+          hide-details
+        />
+      </v-expansion-panel-text>
+    </v-expansion-panel>
+  </v-expansion-panels>
 </template>
+
+<style scoped>
+.filter-accordion {
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid #dbe6f2;
+}
+</style>
