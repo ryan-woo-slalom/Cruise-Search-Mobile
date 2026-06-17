@@ -33,7 +33,8 @@ Generate a fake dataset as a JSON file (src/data/metrics) with cruise data from 
 
 ### Body - Search Results
 - Have a section header separating the Search and Filter controls and the Search Results. This section header should keep a count of the search results.
-- Cards should represent the products and contain the Itinerary name, cruise dates, ship name, the itinerary map, along with a "Save" button to favorite and a "Compare" button to compare cruises
+- "ResultCard" reusable component
+    - should represent the products and contain the Itinerary name, cruise dates, ship name, the itinerary map, along with a "Save" button to favorite and a "Compare" button to compare cruises
     - Cruise cards should have a "Quick view" button to give an overview of the cruise
     - Cruise cards should have a "Book now" button that takes users into the booking flow
     - Cruise cards should have an image of the highlight destination in the itinerary

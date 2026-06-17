@@ -3,6 +3,7 @@ import { computed, ref } from 'vue'
 import { useDisplay } from 'vuetify'
 import cruiseData from '../data/metrics.json'
 import CruiseFilters from '../components/CruiseFilters.vue'
+import ResultCard from '../components/ResultCard.vue'
 import type { CruiseDeparture, StateroomPricing } from '../types/cruise'
 
 type ViewMode = 'itinerary' | 'date'
@@ -39,8 +40,8 @@ const compareIds = ref<string[]>([])
 const quickViewOpen = ref(false)
 const quickViewTitle = ref('')
 const quickViewCruises = ref<CruiseDeparture[]>([])
+const selectedQuickViewDateId = ref('')
 const selectedStateroomType = ref<keyof StateroomPricing>('interior')
-const quickViewGuestCount = ref(2)
 
 const monthFormatter = new Intl.DateTimeFormat('en-US', { month: 'long', year: 'numeric' })
 const dateFormatter = new Intl.DateTimeFormat('en-US', {
@@ -117,22 +118,56 @@ const compareCruises = computed(() =>
   cruises.filter((cruise) => compareIds.value.includes(cruise.id)).sort((a, b) => a.startDate.localeCompare(b.startDate)),
 )
 
-const quickViewPrimary = computed(() => quickViewCruises.value[0])
+const shipHighlights: Record<string, string[]> = {
+  'Intrepid Aurora': ['Skyline pool deck', 'Mediterranean chef table', 'Open-air cinema'],
+  'Intrepid Solstice': ['Family splash zone', 'Tropical juice bar', 'Sunset terrace lounges'],
+  'Intrepid Northwind': ['Panorama observation lounge', 'Glacier-view spa', 'Naturalist talks'],
+  'Intrepid Meridian': ['Nordic thermal suite', 'Fjord-view dining room', 'Live acoustic nights'],
+  'Intrepid Horizon': ['Rooftop pickleball', 'Coastal tasting kitchen', 'Ocean promenade track'],
+  'Intrepid Atlas': ['Transatlantic library', 'Grand ballroom', 'Planetarium dome shows'],
+}
+
+const quickViewSelectedCruise = computed(() => {
+  if (selectedQuickViewDateId.value.length > 0) {
+    const selected = quickViewCruises.value.find((item) => item.id === selectedQuickViewDateId.value)
+    if (selected) {
+      return selected
+    }
+  }
+
+  return quickViewCruises.value[0]
+})
+
+const quickViewDestinations = computed(() => {
+  if (!quickViewSelectedCruise.value) {
+    return []
+  }
+
+  return quickViewSelectedCruise.value.itineraryMap.split('->').map((item) => item.trim())
+})
+
+const quickViewShipHighlights = computed(() => {
+  if (!quickViewSelectedCruise.value) {
+    return []
+  }
+
+  return shipHighlights[quickViewSelectedCruise.value.shipName] ?? ['Signature dining', 'Live entertainment', 'Wellness centre']
+})
 
 const guestCalculatorTotal = computed(() => {
-  if (!quickViewPrimary.value) {
+  if (!quickViewSelectedCruise.value) {
     return 0
   }
 
-  const baseStateroom = quickViewPrimary.value.stateroomPricing[selectedStateroomType.value]
-  const extraGuests = Math.max(quickViewGuestCount.value - 2, 0)
-  const extraGuestRate = Math.round(quickViewPrimary.value.pricePerPerson * 0.75)
+  const baseStateroom = quickViewSelectedCruise.value.stateroomPricing[selectedStateroomType.value]
+  const extraGuests = Math.max(totalGuests.value - 2, 0)
+  const extraGuestRate = Math.round(quickViewSelectedCruise.value.pricePerPerson * 0.75)
 
   return baseStateroom + extraGuests * extraGuestRate
 })
 
 const guestCalculatorPerGuest = computed(() =>
-  Math.round(guestCalculatorTotal.value / quickViewGuestCount.value),
+  Math.round(guestCalculatorTotal.value / totalGuests.value),
 )
 
 function adjustedPricePerPerson(cruise: CruiseDeparture): number {
@@ -205,21 +240,25 @@ function toggleCompare(id: string): void {
 function openQuickView(cruiseSet: CruiseDeparture[], title: string): void {
   quickViewCruises.value = cruiseSet
   quickViewTitle.value = title
+  selectedQuickViewDateId.value = cruiseSet[0]?.id ?? ''
   selectedStateroomType.value = 'interior'
-  quickViewGuestCount.value = totalGuests.value
   quickViewOpen.value = true
+}
+
+function destinationImage(destination: string): string {
+  return `https://picsum.photos/seed/${encodeURIComponent(destination)}/800/420`
 }
 </script>
 
 <template>
   <v-container fluid class="pa-3 pa-sm-5 pa-md-8 cruise-page">
     <v-card class="hero-card mb-5 mb-md-6" rounded="xl" elevation="0">
-      <v-card-text class="py-8 py-md-9 px-5 px-md-9">
+      <v-card-text class="py-7 py-md-9 px-4 px-sm-5 px-md-9">
         <h1 class="text-h4 text-md-h3 font-weight-black mb-2 hero-title">Find your perfect Intrepid voyage</h1>
-        <p class="text-body-1 text-medium-emphasis mb-4 hero-copy">
+        <p class="text-body-2 text-md-body-1 text-medium-emphasis mb-4 hero-copy">
           Search itineraries, compare sail dates, and estimate room pricing in seconds.
         </p>
-        <v-row class="align-center mt-1">
+        <v-row class="align-center mt-1" dense>
           <v-col cols="12" md="8">
             <v-text-field
               v-model="searchQuery"
@@ -232,7 +271,7 @@ function openQuickView(cruiseSet: CruiseDeparture[], title: string): void {
             />
           </v-col>
           <v-col cols="12" md="4">
-            <v-card variant="outlined" class="pa-3 guest-panel h-100">
+            <v-card variant="outlined" class="pa-3 pa-md-4 guest-panel h-100">
               <div class="text-subtitle-2 mb-2">Guests</div>
               <div class="d-flex justify-space-between align-center mb-3">
                 <div>
@@ -290,7 +329,7 @@ function openQuickView(cruiseSet: CruiseDeparture[], title: string): void {
 
       <v-col cols="12" md="9">
         <v-card rounded="xl" elevation="2" class="toolbar-shell mb-4 surface-card">
-          <v-card-text class="py-3 px-3 px-sm-4 d-flex flex-wrap align-center ga-3">
+          <v-card-text class="py-3 px-3 px-sm-4 px-md-5 d-flex flex-wrap align-center ga-2 ga-sm-3">
           <v-btn
             v-if="!mdAndUp"
             color="primary"
@@ -313,132 +352,40 @@ function openQuickView(cruiseSet: CruiseDeparture[], title: string): void {
         </v-card>
 
         <div class="results-header mb-3">
-          <p class="text-overline mb-1">Search Results</p>
-          <h2 class="text-h6 mb-0">Cruises matching your search</h2>
+          <p class="text-overline mb-1 section-kicker">Search Results</p>
+          <h2 class="text-h6 mb-0">Cruises matching your search ({{ filteredCruises.length }})</h2>
         </div>
 
         <v-row v-if="activeView === 'itinerary'">
           <v-col v-for="group in groupedByItinerary" :key="group.itineraryName" cols="12">
-            <v-card rounded="xl" class="mb-4 itinerary-card surface-card" elevation="2">
-              <v-card-text class="pa-4 pa-sm-5">
-                <div class="d-flex justify-space-between flex-wrap ga-3">
-                  <div>
-                    <div class="d-flex align-center ga-2 mb-2">
-                      <v-icon icon="mdi-map-marker-path" color="primary" size="18" />
-                      <h2 class="text-h6 mb-0">{{ group.itineraryName }}</h2>
-                    </div>
-                    <p class="text-body-2 mb-2 route-copy">{{ group.itineraryMap }}</p>
-                    <p class="text-body-2 text-medium-emphasis mb-0 compact-meta">
-                      {{ group.shipName }}
-                      <span class="mx-1">•</span>
-                      {{ group.leadDeparture.nights }} nights
-                      <span class="mx-1">•</span>
-                      from
-                      {{ formatCurrency(Math.min(...group.departures.map((item) => adjustedPricePerPerson(item)))) }} / guest
-                    </p>
-                  </div>
-                    <div class="d-flex flex-wrap ga-2 align-start justify-end card-actions">
-                    <v-btn
-                      size="small"
-                      variant="outlined"
-                      :color="savedIds.includes(group.leadDeparture.id) ? 'secondary' : undefined"
-                      @click="toggleSaved(group.leadDeparture.id)"
-                    >
-                      {{ savedIds.includes(group.leadDeparture.id) ? 'Saved' : 'Save' }}
-                    </v-btn>
-                    <v-btn
-                      size="small"
-                      variant="tonal"
-                      :color="compareIds.includes(group.leadDeparture.id) ? 'secondary' : undefined"
-                      @click="toggleCompare(group.leadDeparture.id)"
-                    >
-                      Compare
-                    </v-btn>
-                    <v-btn
-                      size="small"
-                      color="secondary"
-                      variant="outlined"
-                      @click="openQuickView(group.departures, group.itineraryName)"
-                    >
-                      Quick view
-                    </v-btn>
-                    <v-btn size="small" color="primary" href="#" rounded="pill">Book now</v-btn>
-                  </div>
-                </div>
-
-                <v-expansion-panels variant="accordion" class="mt-4 itinerary-expansion" flat>
-                  <v-expansion-panel rounded="lg" title="Show available cruise dates">
-                    <v-expansion-panel-text>
-                      <v-row>
-                        <v-col v-for="departure in group.departures" :key="departure.id" cols="12" sm="6">
-                          <v-sheet rounded="lg" class="pa-3 departure-chip">
-                            <div class="text-subtitle-2 mb-1">
-                              {{ formatDate(departure.startDate) }} to {{ formatDate(departure.endDate) }}
-                            </div>
-                            <div class="text-caption">Starting at {{ formatCurrency(adjustedPricePerPerson(departure)) }} per person</div>
-                          </v-sheet>
-                        </v-col>
-                      </v-row>
-                    </v-expansion-panel-text>
-                  </v-expansion-panel>
-                </v-expansion-panels>
-              </v-card-text>
-            </v-card>
+            <ResultCard
+              mode="itinerary"
+              :cruise="group.leadDeparture"
+              :departures="group.departures"
+              :image-url="destinationImage(group.leadDeparture.itineraryMap.split('->')[1]?.trim() ?? group.leadDeparture.itineraryName)"
+              :is-saved="savedIds.includes(group.leadDeparture.id)"
+              :is-compared="compareIds.includes(group.leadDeparture.id)"
+              :adjusted-price-per-person="adjustedPricePerPerson(group.leadDeparture)"
+              @save="toggleSaved"
+              @compare="toggleCompare"
+              @quickview="openQuickView"
+            />
           </v-col>
         </v-row>
 
         <v-row v-else>
           <v-col v-for="cruise in filteredCruises" :key="cruise.id" cols="12" sm="6">
-            <v-card rounded="xl" class="fill-height cruise-date-card surface-card" elevation="2">
-              <v-card-text class="pa-4 pa-sm-5">
-                <div class="d-flex justify-space-between ga-3">
-                  <div>
-                    <h2 class="text-subtitle-1 font-weight-bold mb-1 card-title">{{ cruise.itineraryName }}</h2>
-                    <p class="text-body-2 mb-1">{{ cruise.shipName }}</p>
-                    <p class="text-caption text-medium-emphasis mb-2 route-copy">{{ cruise.itineraryMap }}</p>
-                    <p class="text-body-2 mb-0">
-                      {{ formatDate(cruise.startDate) }} to {{ formatDate(cruise.endDate) }}
-                    </p>
-                  </div>
-                  <div class="text-right">
-                    <v-chip color="primary" variant="flat" size="small">{{ formatCurrency(adjustedPricePerPerson(cruise)) }}</v-chip>
-                    <div class="text-caption mt-1">per person</div>
-                  </div>
-                </div>
-
-                <v-divider class="my-3" />
-
-                <v-row dense>
-                  <v-col cols="6">
-                    <div class="text-caption">Interior</div>
-                    <div class="text-body-2 font-weight-medium">{{ formatCurrency(cruise.stateroomPricing.interior) }}</div>
-                  </v-col>
-                  <v-col cols="6">
-                    <div class="text-caption">Balcony</div>
-                    <div class="text-body-2 font-weight-medium">{{ formatCurrency(cruise.stateroomPricing.balcony) }}</div>
-                  </v-col>
-                </v-row>
-              </v-card-text>
-
-              <v-card-actions class="px-4 pb-4 pt-0 px-sm-5 pb-sm-5">
-                <v-btn size="small" variant="outlined" @click="toggleSaved(cruise.id)">
-                  {{ savedIds.includes(cruise.id) ? 'Saved' : 'Save' }}
-                </v-btn>
-                <v-btn
-                  size="small"
-                  variant="tonal"
-                  :color="compareIds.includes(cruise.id) ? 'secondary' : undefined"
-                  @click="toggleCompare(cruise.id)"
-                >
-                  Compare
-                </v-btn>
-                <v-spacer />
-                <v-btn size="small" variant="outlined" @click="openQuickView([cruise], cruise.itineraryName)">
-                  Quick view
-                </v-btn>
-                <v-btn size="small" color="primary" href="#" rounded="pill">Book now</v-btn>
-              </v-card-actions>
-            </v-card>
+            <ResultCard
+              mode="date"
+              :cruise="cruise"
+              :image-url="destinationImage(cruise.itineraryMap.split('->')[1]?.trim() ?? cruise.itineraryName)"
+              :is-saved="savedIds.includes(cruise.id)"
+              :is-compared="compareIds.includes(cruise.id)"
+              :adjusted-price-per-person="adjustedPricePerPerson(cruise)"
+              @save="toggleSaved"
+              @compare="toggleCompare"
+              @quickview="openQuickView"
+            />
           </v-col>
         </v-row>
 
@@ -496,33 +443,55 @@ function openQuickView(cruiseSet: CruiseDeparture[], title: string): void {
 
     <v-dialog v-model="quickViewOpen" max-width="900">
       <v-card rounded="xl" class="quick-view-shell surface-card">
-        <v-card-title class="d-flex align-center justify-space-between">
-          <span>{{ quickViewTitle }}</span>
+        <v-card-title class="d-flex align-center justify-space-between quickview-titlebar">
+          <div>
+            <p class="text-overline mb-0 text-medium-emphasis">Quick View</p>
+            <span>{{ quickViewTitle }}</span>
+          </div>
           <v-btn icon="mdi-close" variant="text" @click="quickViewOpen = false" />
         </v-card-title>
         <v-divider />
-        <v-card-text>
-          <v-row>
+        <v-card-text class="pa-4 pa-sm-5">
+          <v-row class="quickview-grid">
             <v-col cols="12" md="7">
-              <h3 class="text-subtitle-1 font-weight-bold mb-2">Cruise dates</h3>
-              <v-timeline density="compact" align="start" side="end">
-                <v-timeline-item
-                  v-for="cruise in quickViewCruises"
-                  :key="cruise.id"
-                  dot-color="primary"
-                  fill-dot
-                  size="small"
-                >
-                  <div class="text-body-2 font-weight-medium">{{ formatDate(cruise.startDate) }} to {{ formatDate(cruise.endDate) }}</div>
-                  <div class="text-caption">{{ cruise.shipName }} | {{ cruise.nights }} nights</div>
-                  <div class="text-caption">{{ formatCurrency(adjustedPricePerPerson(cruise)) }} per person</div>
-                </v-timeline-item>
-              </v-timeline>
+              <h3 class="text-subtitle-1 font-weight-bold mb-3">Cruise itinerary</h3>
+              <v-select
+                v-model="selectedQuickViewDateId"
+                label="Cruise date"
+                variant="outlined"
+                density="comfortable"
+                class="mb-4"
+                :items="quickViewCruises.map((item) => ({ title: `${formatDate(item.startDate)} - ${formatDate(item.endDate)}`, value: item.id }))"
+              />
+
+              <v-sheet rounded="lg" class="pa-4 mb-4 itinerary-summary section-surface">
+                <p class="text-body-2 mb-2"><strong>Route:</strong> {{ quickViewSelectedCruise?.itineraryMap }}</p>
+                <p class="text-body-2 mb-0">
+                  <strong>Ship:</strong> {{ quickViewSelectedCruise?.shipName }}
+                  <span class="mx-1">•</span>
+                  <strong>Nights:</strong> {{ quickViewSelectedCruise?.nights }}
+                </p>
+              </v-sheet>
+
+              <h4 class="text-subtitle-2 font-weight-bold mb-2">Highlighted destinations</h4>
+              <v-row>
+                <v-col v-for="destination in quickViewDestinations" :key="destination" cols="12" sm="6">
+                  <v-card rounded="lg" elevation="1" class="destination-card section-surface">
+                    <v-img :src="destinationImage(destination)" height="120" cover />
+                    <v-card-text class="py-2 px-3 text-body-2 font-weight-medium">{{ destination }}</v-card-text>
+                  </v-card>
+                </v-col>
+              </v-row>
             </v-col>
 
             <v-col cols="12" md="5">
-              <v-sheet rounded="lg" class="pa-4 calculator-shell">
-                <h3 class="text-subtitle-1 font-weight-bold mb-3">Guest calculator</h3>
+              <v-sheet rounded="lg" class="pa-4 calculator-shell section-surface">
+                <h3 class="text-subtitle-1 font-weight-bold mb-3">Ship highlights</h3>
+                <v-list density="compact" class="mb-4 bg-transparent">
+                  <v-list-item v-for="highlight in quickViewShipHighlights" :key="highlight" :title="highlight" prepend-icon="mdi-star-four-points" />
+                </v-list>
+
+                <h3 class="text-subtitle-1 font-weight-bold mb-3">Pricing calculator</h3>
                 <v-select
                   v-model="selectedStateroomType"
                   label="Stateroom"
@@ -536,27 +505,15 @@ function openQuickView(cruiseSet: CruiseDeparture[], title: string): void {
                     { title: 'Suite', value: 'suite' },
                   ]"
                 />
-
-                <div class="mt-4">
-                  <div class="text-body-2 mb-1">Guests (max 4)</div>
-                  <v-slider
-                    v-model="quickViewGuestCount"
-                    :min="1"
-                    :max="4"
-                    :step="1"
-                    color="primary"
-                    thumb-label="always"
-                    hide-details
-                  />
-                </div>
+                <p class="text-caption text-medium-emphasis mt-3 mb-0">Using global guest selection: {{ guestSummary }}</p>
 
                 <v-divider class="my-4" />
 
-                <div class="d-flex justify-space-between text-body-2 mb-2">
+                <div class="d-flex justify-space-between text-body-2 mb-2 price-row">
                   <span>Estimated stateroom total</span>
                   <strong>{{ formatCurrency(guestCalculatorTotal) }}</strong>
                 </div>
-                <div class="d-flex justify-space-between text-body-2">
+                <div class="d-flex justify-space-between text-body-2 price-row">
                   <span>Average per guest</span>
                   <strong>{{ formatCurrency(guestCalculatorPerGuest) }}</strong>
                 </div>
@@ -584,6 +541,7 @@ function openQuickView(cruiseSet: CruiseDeparture[], title: string): void {
 .hero-copy {
   max-width: 58ch;
   color: #3e6287 !important;
+  line-height: 1.5;
 }
 
 .hero-title {
@@ -618,13 +576,45 @@ function openQuickView(cruiseSet: CruiseDeparture[], title: string): void {
   background: #f9fcff;
 }
 
+.section-kicker {
+  letter-spacing: 0.08em;
+}
+
 .toolbar-shell {
   background: #ffffff;
 }
 
 .results-header {
   border-top: 1px solid #d6e3f0;
-  padding-top: 12px;
+  padding-top: 14px;
+}
+
+.quickview-titlebar {
+  background: linear-gradient(180deg, #f8fbff 0%, #f2f7fd 100%);
+}
+
+.quickview-grid {
+  align-items: start;
+}
+
+.section-surface {
+  border: 1px solid #dce8f4;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.6);
+}
+
+.itinerary-summary {
+  background: linear-gradient(180deg, #fbfdff 0%, #f2f7fd 100%);
+}
+
+.destination-card {
+  overflow: hidden;
+}
+
+.price-row {
+  background: #f7fbff;
+  border: 1px solid #dde8f3;
+  border-radius: 10px;
+  padding: 10px 12px;
 }
 
 .route-copy {
@@ -664,8 +654,18 @@ function openQuickView(cruiseSet: CruiseDeparture[], title: string): void {
 }
 
 @media (max-width: 600px) {
-  .card-actions {
-    min-width: unset;
+  .hero-title {
+    font-size: 1.65rem !important;
+    line-height: 1.2;
+  }
+
+  .toolbar-shell :deep(.v-btn-toggle .v-btn) {
+    font-size: 0.72rem;
+    padding-inline: 10px;
+  }
+
+  .results-header h2 {
+    font-size: 1.1rem;
   }
 }
 </style>
