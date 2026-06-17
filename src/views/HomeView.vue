@@ -3,7 +3,6 @@ import { computed, ref } from 'vue'
 import { useDisplay } from 'vuetify'
 import cruiseData from '../data/metrics.json'
 import CruiseFilters from '../components/CruiseFilters.vue'
-import PriceTrendChart from '../components/PriceTrendChart.vue'
 import type { CruiseDeparture, StateroomPricing } from '../types/cruise'
 
 type ViewMode = 'itinerary' | 'date'
@@ -25,6 +24,8 @@ const minNights = Math.min(...cruises.map((cruise) => cruise.nights))
 const maxNights = Math.max(...cruises.map((cruise) => cruise.nights))
 
 const searchQuery = ref('')
+const adultsCount = ref(2)
+const childrenCount = ref(0)
 const selectedMonths = ref<string[]>([])
 const selectedShips = ref<string[]>([])
 const priceRange = ref<number[]>([minPrice, maxPrice])
@@ -39,7 +40,7 @@ const quickViewOpen = ref(false)
 const quickViewTitle = ref('')
 const quickViewCruises = ref<CruiseDeparture[]>([])
 const selectedStateroomType = ref<keyof StateroomPricing>('interior')
-const guestCount = ref(2)
+const quickViewGuestCount = ref(2)
 
 const monthFormatter = new Intl.DateTimeFormat('en-US', { month: 'long', year: 'numeric' })
 const dateFormatter = new Intl.DateTimeFormat('en-US', {
@@ -58,6 +59,9 @@ const monthOptions = computed(() => {
 
 const shipOptions = computed(() => [...new Set(cruises.map((cruise) => cruise.shipName))].sort())
 
+const totalGuests = computed(() => adultsCount.value + childrenCount.value)
+const guestSummary = computed(() => `${adultsCount.value} Adults, ${childrenCount.value} Children`)
+
 const filteredCruises = computed(() => {
   const query = searchQuery.value.trim().toLowerCase()
   const [selectedMinPrice = minPrice, selectedMaxPrice = maxPrice] = priceRange.value
@@ -74,8 +78,8 @@ const filteredCruises = computed(() => {
       selectedMonths.value.length === 0 || selectedMonths.value.includes(cruiseMonth)
     const matchesShip =
       selectedShips.value.length === 0 || selectedShips.value.includes(cruise.shipName)
-    const matchesPrice =
-      cruise.pricePerPerson >= selectedMinPrice && cruise.pricePerPerson <= selectedMaxPrice
+    const adjustedPrice = adjustedPricePerPerson(cruise)
+    const matchesPrice = adjustedPrice >= selectedMinPrice && adjustedPrice <= selectedMaxPrice
     const matchesNights =
       cruise.nights >= selectedMinNights && cruise.nights <= selectedMaxNights
 
@@ -121,13 +125,50 @@ const guestCalculatorTotal = computed(() => {
   }
 
   const baseStateroom = quickViewPrimary.value.stateroomPricing[selectedStateroomType.value]
-  const extraGuests = Math.max(guestCount.value - 2, 0)
+  const extraGuests = Math.max(quickViewGuestCount.value - 2, 0)
   const extraGuestRate = Math.round(quickViewPrimary.value.pricePerPerson * 0.75)
 
   return baseStateroom + extraGuests * extraGuestRate
 })
 
-const guestCalculatorPerGuest = computed(() => Math.round(guestCalculatorTotal.value / guestCount.value))
+const guestCalculatorPerGuest = computed(() =>
+  Math.round(guestCalculatorTotal.value / quickViewGuestCount.value),
+)
+
+function adjustedPricePerPerson(cruise: CruiseDeparture): number {
+  const extraAdults = Math.max(adultsCount.value - 2, 0)
+  const extraChildren = childrenCount.value
+  const total = cruise.totalBasePrice + cruise.pricePerPerson * extraAdults * 0.85 + cruise.pricePerPerson * extraChildren * 0.6
+  return Math.round(total / totalGuests.value)
+}
+
+function incrementAdults(): void {
+  if (totalGuests.value < 4) {
+    adultsCount.value += 1
+  }
+}
+
+function decrementAdults(): void {
+  const minimumAdults = childrenCount.value > 0 ? 1 : 1
+  if (adultsCount.value > minimumAdults) {
+    adultsCount.value -= 1
+  }
+}
+
+function incrementChildren(): void {
+  if (totalGuests.value < 4) {
+    childrenCount.value += 1
+    if (adultsCount.value === 0) {
+      adultsCount.value = 1
+    }
+  }
+}
+
+function decrementChildren(): void {
+  if (childrenCount.value > 0) {
+    childrenCount.value -= 1
+  }
+}
 
 function formatCurrency(value: number): string {
   return new Intl.NumberFormat('en-US', {
@@ -165,7 +206,7 @@ function openQuickView(cruiseSet: CruiseDeparture[], title: string): void {
   quickViewCruises.value = cruiseSet
   quickViewTitle.value = title
   selectedStateroomType.value = 'interior'
-  guestCount.value = 2
+  quickViewGuestCount.value = totalGuests.value
   quickViewOpen.value = true
 }
 </script>
@@ -174,26 +215,49 @@ function openQuickView(cruiseSet: CruiseDeparture[], title: string): void {
   <v-container fluid class="pa-3 pa-sm-5 pa-md-8 cruise-page">
     <v-card class="hero-card mb-5 mb-md-6" rounded="xl" elevation="0">
       <v-card-text class="py-8 py-md-9 px-5 px-md-9">
-        <div class="d-flex align-center ga-2 mb-3">
-          <v-chip color="primary" size="small" variant="tonal">Cruise Search</v-chip>
-          <v-chip color="secondary" size="small" variant="tonal">Jul-Dec 2027</v-chip>
-        </div>
         <h1 class="text-h4 text-md-h3 font-weight-black mb-2 hero-title">Find your perfect Intrepid voyage</h1>
         <p class="text-body-1 text-medium-emphasis mb-4 hero-copy">
           Search itineraries, compare sail dates, and estimate room pricing in seconds.
         </p>
-        <v-row>
-          <v-col cols="4">
-            <div class="hero-stat-label">Itineraries</div>
-            <div class="hero-stat-value">{{ groupedByItinerary.length }}</div>
+        <v-row class="align-center mt-1">
+          <v-col cols="12" md="8">
+            <v-text-field
+              v-model="searchQuery"
+              label="Search itineraries, ships, destinations"
+              prepend-inner-icon="mdi-magnify"
+              variant="outlined"
+              hide-details
+              density="comfortable"
+              bg-color="white"
+            />
           </v-col>
-          <v-col cols="4">
-            <div class="hero-stat-label">Cruise Dates</div>
-            <div class="hero-stat-value">{{ filteredCruises.length }}</div>
-          </v-col>
-          <v-col cols="4">
-            <div class="hero-stat-label">Saved</div>
-            <div class="hero-stat-value">{{ savedIds.length }}</div>
+          <v-col cols="12" md="4">
+            <v-card variant="outlined" class="pa-3 guest-panel h-100">
+              <div class="text-subtitle-2 mb-2">Guests</div>
+              <div class="d-flex justify-space-between align-center mb-3">
+                <div>
+                  <div class="text-body-2 font-weight-medium">Adults</div>
+                  <div class="text-caption text-medium-emphasis">Ages 18+</div>
+                </div>
+                <div class="d-flex align-center ga-2">
+                  <v-btn icon="mdi-minus" size="x-small" variant="tonal" @click="decrementAdults" />
+                  <strong>{{ adultsCount }}</strong>
+                  <v-btn icon="mdi-plus" size="x-small" variant="tonal" @click="incrementAdults" />
+                </div>
+              </div>
+              <div class="d-flex justify-space-between align-center mb-2">
+                <div>
+                  <div class="text-body-2 font-weight-medium">Children</div>
+                  <div class="text-caption text-medium-emphasis">Under 18</div>
+                </div>
+                <div class="d-flex align-center ga-2">
+                  <v-btn icon="mdi-minus" size="x-small" variant="tonal" @click="decrementChildren" />
+                  <strong>{{ childrenCount }}</strong>
+                  <v-btn icon="mdi-plus" size="x-small" variant="tonal" @click="incrementChildren" />
+                </div>
+              </div>
+              <p class="text-caption text-medium-emphasis mb-0">{{ guestSummary }} • Max 4 guests per stateroom.</p>
+            </v-card>
           </v-col>
         </v-row>
       </v-card-text>
@@ -209,7 +273,6 @@ function openQuickView(cruiseSet: CruiseDeparture[], title: string): void {
           <v-divider />
           <v-card-text>
             <CruiseFilters
-              v-model:search-query="searchQuery"
               v-model:selected-months="selectedMonths"
               v-model:selected-ships="selectedShips"
               v-model:price-range="priceRange"
@@ -249,15 +312,10 @@ function openQuickView(cruiseSet: CruiseDeparture[], title: string): void {
           </v-card-text>
         </v-card>
 
-        <v-card rounded="xl" class="mb-6 pricing-shell surface-card" elevation="2">
-          <v-card-title class="pt-5 pb-1 d-flex align-center ga-2">
-            <v-icon icon="mdi-chart-line" color="primary" />
-            Pricing trend
-          </v-card-title>
-          <v-card-text>
-            <PriceTrendChart :cruises="filteredCruises" />
-          </v-card-text>
-        </v-card>
+        <div class="results-header mb-3">
+          <p class="text-overline mb-1">Search Results</p>
+          <h2 class="text-h6 mb-0">Cruises matching your search</h2>
+        </div>
 
         <v-row v-if="activeView === 'itinerary'">
           <v-col v-for="group in groupedByItinerary" :key="group.itineraryName" cols="12">
@@ -276,7 +334,7 @@ function openQuickView(cruiseSet: CruiseDeparture[], title: string): void {
                       {{ group.leadDeparture.nights }} nights
                       <span class="mx-1">•</span>
                       from
-                      {{ formatCurrency(Math.min(...group.departures.map((item) => item.pricePerPerson))) }} / guest
+                      {{ formatCurrency(Math.min(...group.departures.map((item) => adjustedPricePerPerson(item)))) }} / guest
                     </p>
                   </div>
                     <div class="d-flex flex-wrap ga-2 align-start justify-end card-actions">
@@ -317,7 +375,7 @@ function openQuickView(cruiseSet: CruiseDeparture[], title: string): void {
                             <div class="text-subtitle-2 mb-1">
                               {{ formatDate(departure.startDate) }} to {{ formatDate(departure.endDate) }}
                             </div>
-                            <div class="text-caption">Starting at {{ formatCurrency(departure.pricePerPerson) }} per person</div>
+                            <div class="text-caption">Starting at {{ formatCurrency(adjustedPricePerPerson(departure)) }} per person</div>
                           </v-sheet>
                         </v-col>
                       </v-row>
@@ -343,7 +401,7 @@ function openQuickView(cruiseSet: CruiseDeparture[], title: string): void {
                     </p>
                   </div>
                   <div class="text-right">
-                    <v-chip color="primary" variant="flat" size="small">{{ formatCurrency(cruise.pricePerPerson) }}</v-chip>
+                    <v-chip color="primary" variant="flat" size="small">{{ formatCurrency(adjustedPricePerPerson(cruise)) }}</v-chip>
                     <div class="text-caption mt-1">per person</div>
                   </div>
                 </div>
@@ -404,7 +462,7 @@ function openQuickView(cruiseSet: CruiseDeparture[], title: string): void {
                 <td>{{ cruise.itineraryName }}</td>
                 <td>{{ cruise.shipName }}</td>
                 <td>{{ formatDate(cruise.startDate) }} - {{ formatDate(cruise.endDate) }}</td>
-                <td>{{ formatCurrency(cruise.pricePerPerson) }}</td>
+                <td>{{ formatCurrency(adjustedPricePerPerson(cruise)) }}</td>
               </tr>
             </tbody>
           </v-table>
@@ -421,7 +479,6 @@ function openQuickView(cruiseSet: CruiseDeparture[], title: string): void {
         </v-toolbar>
         <v-card-text>
           <CruiseFilters
-            v-model:search-query="searchQuery"
             v-model:selected-months="selectedMonths"
             v-model:selected-ships="selectedShips"
             v-model:price-range="priceRange"
@@ -458,7 +515,7 @@ function openQuickView(cruiseSet: CruiseDeparture[], title: string): void {
                 >
                   <div class="text-body-2 font-weight-medium">{{ formatDate(cruise.startDate) }} to {{ formatDate(cruise.endDate) }}</div>
                   <div class="text-caption">{{ cruise.shipName }} | {{ cruise.nights }} nights</div>
-                  <div class="text-caption">{{ formatCurrency(cruise.pricePerPerson) }} per person</div>
+                  <div class="text-caption">{{ formatCurrency(adjustedPricePerPerson(cruise)) }} per person</div>
                 </v-timeline-item>
               </v-timeline>
             </v-col>
@@ -483,7 +540,7 @@ function openQuickView(cruiseSet: CruiseDeparture[], title: string): void {
                 <div class="mt-4">
                   <div class="text-body-2 mb-1">Guests (max 4)</div>
                   <v-slider
-                    v-model="guestCount"
+                    v-model="quickViewGuestCount"
                     :min="1"
                     :max="4"
                     :step="1"
@@ -534,20 +591,6 @@ function openQuickView(cruiseSet: CruiseDeparture[], title: string): void {
   color: #123c66;
 }
 
-.hero-stat-label {
-  font-size: 0.72rem;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: #4a6f94;
-  font-weight: 700;
-}
-
-.hero-stat-value {
-  font-size: 1.35rem;
-  font-weight: 800;
-  color: #103a61;
-}
-
 .sticky-filters {
   position: sticky;
   top: 88px;
@@ -570,8 +613,18 @@ function openQuickView(cruiseSet: CruiseDeparture[], title: string): void {
   box-shadow: 0 10px 22px rgba(24, 79, 126, 0.08);
 }
 
+.guest-panel {
+  border-color: #cfdfee !important;
+  background: #f9fcff;
+}
+
 .toolbar-shell {
   background: #ffffff;
+}
+
+.results-header {
+  border-top: 1px solid #d6e3f0;
+  padding-top: 12px;
 }
 
 .route-copy {

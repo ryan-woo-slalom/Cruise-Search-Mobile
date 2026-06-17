@@ -8,7 +8,6 @@ defineProps<{
   maxNights: number
 }>()
 
-const searchQuery = defineModel<string>('searchQuery', { required: true })
 const selectedMonths = defineModel<string[]>('selectedMonths', { required: true })
 const selectedShips = defineModel<string[]>('selectedShips', { required: true })
 const priceRange = defineModel<number[]>('priceRange', { required: true })
@@ -17,19 +16,6 @@ const nightsRange = defineModel<number[]>('nightsRange', { required: true })
 
 <template>
   <v-expansion-panels variant="accordion" class="filter-accordion">
-    <v-expansion-panel title="Search">
-      <v-expansion-panel-text>
-        <v-text-field
-          v-model="searchQuery"
-          label="Search itinerary or ship"
-          prepend-inner-icon="mdi-magnify"
-          variant="outlined"
-          hide-details
-          density="comfortable"
-        />
-      </v-expansion-panel-text>
-    </v-expansion-panel>
-
     <v-expansion-panel title="Sailing month">
       <v-expansion-panel-text>
         <v-select
