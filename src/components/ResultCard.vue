@@ -83,6 +83,30 @@ function openQuickView(): void {
         <v-chip color="white" size="small" variant="flat">{{ cruise.shipName }}</v-chip>
         <v-chip color="primary" size="small" variant="flat" class="ml-2">{{ cardLabel }}</v-chip>
       </div>
+      <div class="image-actions">
+        <v-btn
+          icon
+          size="small"
+          variant="flat"
+          :color="isSaved ? 'secondary' : 'white'"
+          class="icon-action"
+          :aria-label="isSaved ? 'Remove from favorites' : 'Save to favorites'"
+          @click.stop="emit('save', cruise.id)"
+        >
+          <v-icon :icon="isSaved ? 'mdi-heart' : 'mdi-heart-outline'" />
+        </v-btn>
+        <v-btn
+          icon
+          size="small"
+          variant="flat"
+          :color="isCompared ? 'secondary' : 'white'"
+          class="icon-action mt-2"
+          :aria-label="isCompared ? 'Remove from compare' : 'Add to compare'"
+          @click.stop="emit('compare', cruise.id)"
+        >
+          <v-icon :icon="isCompared ? 'mdi-checkbox-marked' : 'mdi-checkbox-blank-outline'" />
+        </v-btn>
+      </div>
     </v-img>
 
     <v-card-text class="pa-4 pa-sm-5 pa-md-6 card-content">
@@ -138,12 +162,6 @@ function openQuickView(): void {
     </v-card-text>
 
     <v-card-actions class="px-4 pb-5 pt-3 px-sm-5 pb-sm-5 px-md-6 pb-md-6 card-actions">
-      <v-btn size="small" variant="outlined" :color="isSaved ? 'secondary' : undefined" @click="emit('save', cruise.id)">
-        {{ isSaved ? 'Saved' : 'Save' }}
-      </v-btn>
-      <v-btn size="small" variant="tonal" :color="isCompared ? 'secondary' : undefined" @click="emit('compare', cruise.id)">
-        Compare
-      </v-btn>
       <v-spacer />
       <v-btn size="small" variant="outlined" @click="openQuickView">Quick view</v-btn>
       <v-btn size="small" color="primary" href="#" rounded="pill">Book now</v-btn>
@@ -176,6 +194,19 @@ function openQuickView(): void {
   position: absolute;
   left: 12px;
   bottom: 12px;
+}
+
+.image-actions {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
+
+.icon-action {
+  box-shadow: 0 4px 12px rgba(16, 58, 97, 0.15);
 }
 
 .card-content {

@@ -35,16 +35,26 @@ Generate a fake dataset as a JSON file (src/data/metrics) with cruise data from 
 ### Body - Search Results
 - Have a section header separating the Search and Filter controls and the Search Results. This section header should keep a count of the search results.
 - "ResultCard" reusable component
-    - should represent the products and contain the Itinerary name, cruise dates, ship name, the itinerary map, along with a "Save" button to favorite and a "Compare" button to compare cruises
+    - Should represent the products and contain the Itinerary name, cruise dates, ship name, the itinerary map
+    - "Save" button (Heart icon) to save to Favorites in the upper right of the card
+    - "Compare" button (Checkbox with "Compare" label) to compare cruises in the upper right of the card
     - Cruise cards should have a "Quick view" button to give an overview of the cruise
     - Cruise cards should have a "Book now" button that takes users into the booking flow
     - Cruise cards should have an image of the highlight destination in the itinerary
-- Quickview
+- Quickview modal
     - Should contain the cruise itinerary
     - Should include information and highlights about the ship
     - Should include highlighted destinations
     - Should include a date selector
     - Should include a pricing calculator based off the global "Guests" control as reference
+    - Should have a "Close" button that closes the modal
+    - Should have a "Book now" button that takes user into the booking flow
+
+### Body - Features
+- Compare
+    - Once a cruise card is selected to be compared, a "Compare" panel should slide up from the bottom (maximum 4 selections)
+    - Should have a "Collapse" button to collapse the panel
+    - Should have a "Compare" button to open the Compare module that allows users to compare various aspects of the cruises
 
 ### Footer
 - Footer on bottom

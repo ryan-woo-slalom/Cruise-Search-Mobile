@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useDisplay } from 'vuetify'
 import cruiseData from '../data/metrics.json'
 import CruiseFilters from '../components/CruiseFilters.vue'
@@ -48,6 +48,8 @@ const quickViewTitle = ref('')
 const quickViewCruises = ref<CruiseDeparture[]>([])
 const selectedQuickViewDateId = ref('')
 const selectedStateroomType = ref<keyof StateroomPricing>('interior')
+const comparePanelCollapsed = ref(false)
+const compareModuleOpen = ref(false)
 
 const monthFormatter = new Intl.DateTimeFormat('en-US', { month: 'long', year: 'numeric' })
 const dateFormatter = new Intl.DateTimeFormat('en-US', {
@@ -283,13 +285,19 @@ function toggleCompare(id: string): void {
     return
   }
 
-  if (compareIds.value.length >= 3) {
+  if (compareIds.value.length >= 4) {
     compareIds.value = [...compareIds.value.slice(1), id]
     return
   }
 
   compareIds.value = [...compareIds.value, id]
 }
+
+watch(compareIds, (nextIds) => {
+  if (nextIds.length > 0) {
+    comparePanelCollapsed.value = false
+  }
+})
 
 function openQuickView(cruiseSet: CruiseDeparture[], title: string): void {
   quickViewCruises.value = cruiseSet
@@ -302,6 +310,48 @@ function openQuickView(cruiseSet: CruiseDeparture[], title: string): void {
 function destinationImage(destination: string): string {
   return `https://picsum.photos/seed/${encodeURIComponent(destination)}/800/420`
 }
+
+function openCompareModule(): void {
+  compareModuleOpen.value = true
+}
+
+function closeComparePanel(): void {
+  comparePanelCollapsed.value = true
+}
+
+function clearCompareSelections(): void {
+  compareIds.value = []
+  comparePanelCollapsed.value = true
+}
+
+const comparePanelVisible = computed(() => compareIds.value.length > 0 && !comparePanelCollapsed.value)
+
+const compareRows = computed(() => [
+  {
+    label: 'Itinerary',
+    values: compareCruises.value.map((cruise) => cruise.itineraryName),
+  },
+  {
+    label: 'Ship',
+    values: compareCruises.value.map((cruise) => cruise.shipName),
+  },
+  {
+    label: 'Dates',
+    values: compareCruises.value.map((cruise) => `${formatDate(cruise.startDate)} - ${formatDate(cruise.endDate)}`),
+  },
+  {
+    label: 'Nights',
+    values: compareCruises.value.map((cruise) => `${cruise.nights}`),
+  },
+  {
+    label: `Price per ${pricingLabel.value}`,
+    values: compareCruises.value.map((cruise) => formatCurrency(pricingValue(cruise))),
+  },
+  {
+    label: 'Map',
+    values: compareCruises.value.map((cruise) => cruise.itineraryMap),
+  },
+])
 </script>
 
 <template>
@@ -410,19 +460,35 @@ function destinationImage(destination: string): string {
             Filters
           </v-btn>
 
-          <v-btn-toggle v-model="activeView" mandatory color="primary" divided rounded="pill">
-            <v-btn value="itinerary">View by Itinerary</v-btn>
-            <v-btn value="date">View by Cruise Date</v-btn>
-          </v-btn-toggle>
+          <div class="dropdown-control">
+            <span class="control-label">View by</span>
+            <v-select
+              v-model="activeView"
+              :items="[
+                { title: 'Itinerary', value: 'itinerary' },
+                { title: 'Cruise Date', value: 'date' },
+              ]"
+              variant="outlined"
+              density="compact"
+              hide-details
+              class="control-select"
+            />
+          </div>
 
-          <v-btn-toggle v-model="pricingMode" mandatory color="secondary" divided rounded="pill">
-            <v-btn value="stateroom">Pricing by Stateroom</v-btn>
-            <v-btn value="person">Pricing by Person</v-btn>
-          </v-btn-toggle>
-
-          <v-chip color="secondary" variant="tonal" prepend-icon="mdi-ferry">
-            {{ filteredCruises.length }} cruise dates found
-          </v-chip>
+          <div class="dropdown-control">
+            <span class="control-label">Pricing by</span>
+            <v-select
+              v-model="pricingMode"
+              :items="[
+                { title: 'Per Stateroom', value: 'stateroom' },
+                { title: 'Per Person', value: 'person' },
+              ]"
+              variant="outlined"
+              density="compact"
+              hide-details
+              class="control-select"
+            />
+          </div>
           </v-card-text>
         </v-card>
 
@@ -467,31 +533,37 @@ function destinationImage(destination: string): string {
           </v-col>
         </v-row>
 
-        <v-card v-if="compareCruises.length > 0" rounded="xl" class="mt-6 compare-shell surface-card" elevation="2">
-          <v-card-title class="d-flex align-center ga-2">
-            <v-icon icon="mdi-compare" color="secondary" />
-            Compare cruises ({{ compareCruises.length }}/3)
-          </v-card-title>
-          <v-divider />
-          <v-table density="comfortable">
-            <thead>
-              <tr>
-                <th>Itinerary</th>
-                <th>Ship</th>
-                <th>Dates</th>
-                <th>Price / {{ pricingLabel }}</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="cruise in compareCruises" :key="cruise.id">
-                <td>{{ cruise.itineraryName }}</td>
-                <td>{{ cruise.shipName }}</td>
-                <td>{{ formatDate(cruise.startDate) }} - {{ formatDate(cruise.endDate) }}</td>
-                <td>{{ formatCurrency(pricingValue(cruise)) }}</td>
-              </tr>
-            </tbody>
-          </v-table>
-        </v-card>
+        <v-bottom-sheet v-model="comparePanelVisible" inset persistent>
+          <v-card rounded="xl" class="compare-panel surface-card">
+            <v-card-title class="d-flex align-center justify-space-between py-3">
+              <div class="d-flex align-center ga-2">
+                <v-icon icon="mdi-compare" color="secondary" />
+                <span>Compare panel ({{ compareCruises.length }}/4)</span>
+              </div>
+              <div class="d-flex align-center ga-2">
+                <v-btn size="small" variant="text" @click="closeComparePanel">Collapse</v-btn>
+                <v-btn size="small" color="primary" :disabled="compareCruises.length < 2" @click="openCompareModule">
+                  Compare
+                </v-btn>
+              </div>
+            </v-card-title>
+            <v-divider />
+            <v-card-text class="py-3">
+              <div class="d-flex flex-wrap ga-2">
+                <v-chip
+                  v-for="cruise in compareCruises"
+                  :key="cruise.id"
+                  color="secondary"
+                  variant="tonal"
+                  closable
+                  @click:close="toggleCompare(cruise.id)"
+                >
+                  {{ cruise.itineraryName }}
+                </v-chip>
+              </div>
+            </v-card-text>
+          </v-card>
+        </v-bottom-sheet>
       </v-col>
     </v-row>
 
@@ -599,6 +671,40 @@ function destinationImage(destination: string): string {
             </v-col>
           </v-row>
         </v-card-text>
+        <v-divider />
+        <v-card-actions class="justify-end px-4 pb-4 px-sm-5 pb-sm-5">
+          <v-btn variant="text" @click="quickViewOpen = false">Close</v-btn>
+          <v-btn color="primary" href="#" rounded="pill">Book now</v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
+    <v-dialog v-model="compareModuleOpen" max-width="1100">
+      <v-card rounded="xl" class="surface-card">
+        <v-card-title class="d-flex align-center justify-space-between quickview-titlebar">
+          <div>
+            <p class="text-overline mb-0 text-medium-emphasis">Compare</p>
+            <span>Side-by-side cruise comparison</span>
+          </div>
+          <v-btn icon="mdi-close" variant="text" @click="compareModuleOpen = false" />
+        </v-card-title>
+        <v-divider />
+        <v-card-text>
+          <v-table density="comfortable">
+            <thead>
+              <tr>
+                <th>Aspect</th>
+                <th v-for="cruise in compareCruises" :key="cruise.id">{{ cruise.itineraryName }}</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="row in compareRows" :key="row.label">
+                <td class="font-weight-medium">{{ row.label }}</td>
+                <td v-for="(value, index) in row.values" :key="`${row.label}-${index}`">{{ value }}</td>
+              </tr>
+            </tbody>
+          </v-table>
+        </v-card-text>
       </v-card>
     </v-dialog>
   </v-container>
@@ -660,6 +766,23 @@ function destinationImage(destination: string): string {
 
 .toolbar-shell {
   background: #ffffff;
+}
+
+.dropdown-control {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.control-label {
+  font-size: 0.8rem;
+  color: #2b557f;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+}
+
+.control-select {
+  min-width: 170px;
 }
 
 .results-header {
@@ -731,15 +854,24 @@ function destinationImage(destination: string): string {
   border: 1px solid #d5e4f3;
 }
 
+.compare-panel {
+  border-top-left-radius: 18px;
+  border-top-right-radius: 18px;
+}
+
 @media (max-width: 600px) {
   .hero-title {
     font-size: 1.65rem !important;
     line-height: 1.2;
   }
 
-  .toolbar-shell :deep(.v-btn-toggle .v-btn) {
-    font-size: 0.72rem;
-    padding-inline: 10px;
+  .dropdown-control {
+    width: 100%;
+  }
+
+  .control-select {
+    min-width: 0;
+    flex: 1;
   }
 
   .results-header h2 {
