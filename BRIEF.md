@@ -23,13 +23,14 @@ Generate a fake dataset as a JSON file (src/data/metrics) with cruise data from 
 
 ### Body - Search, Filter and Sort
 - Long full-width Search input bar at the top of the page that allows users to do a keyword search. It should not be in the Filters.
-- Next to the Search input bar should be a "Guests" control where users can choose the number of guests per stateroom with a "Adults" and "Children" control. Maximum number of guests should be 4. With at least one Child, there must be at least one Adult. This "Guests" control changes the price per person calculation.
+- Next to the Search input bar should be a Staterooms control where users can choose the number of staterooms for their cruise, and then also the number of guests per stateroom. Each stateroom should have an "Adults" and "Children" control. Maximum number of guests should be 4. With at least one Child, there must be at least one Adult. This "Guests" control changes the price per person calculation.
 - Filters on left rail (for desktop) and on a button (for mobile)
+- "Pricing by" button group: Per Stateroom and Per Person 
 - "View by" button group: Itinerary and Cruise Date
-- Product cards by Itinerary
-    - Users should be able to dig into each Itinerary to see a quick view of the cruise along with cruise dates that fall under that Itinerary
-- Product cards by Cruise Date
-    - Users should be able to dig into each Cruise Date to see a quick view of the cruise along with stateroom pricing
+    - Product cards by Itinerary
+        - Users should be able to dig into each Itinerary to see a quick view of the cruise along with cruise dates that fall under that Itinerary
+    - Product cards by Cruise Date
+        - Users should be able to dig into each Cruise Date to see a quick view of the cruise along with stateroom pricing
 
 ### Body - Search Results
 - Have a section header separating the Search and Filter controls and the Search Results. This section header should keep a count of the search results.

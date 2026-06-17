@@ -10,10 +10,13 @@ const props = withDefaults(
     imageUrl: string
     isSaved: boolean
     isCompared: boolean
-    adjustedPricePerPerson: number
+    displayPrice: number
+    priceLabel: string
+    departurePrices?: Record<string, number>
   }>(),
   {
     departures: () => [],
+    departurePrices: () => ({}),
   },
 )
 
@@ -93,8 +96,8 @@ function openQuickView(): void {
           </p>
         </div>
         <div class="text-right price-wrap">
-          <v-chip color="primary" variant="flat" size="small">{{ formatCurrency(adjustedPricePerPerson) }}</v-chip>
-          <div class="text-caption mt-1">per person</div>
+          <v-chip color="primary" variant="flat" size="small">{{ formatCurrency(displayPrice) }}</v-chip>
+          <div class="text-caption mt-1">{{ priceLabel }}</div>
         </div>
       </div>
 
@@ -108,7 +111,9 @@ function openQuickView(): void {
                     <div class="text-subtitle-2 mb-1">
                       {{ formatDate(departure.startDate) }} to {{ formatDate(departure.endDate) }}
                     </div>
-                    <div class="text-caption">Starting at {{ formatCurrency(departure.pricePerPerson) }} / person</div>
+                    <div class="text-caption">
+                      Starting at {{ formatCurrency(departurePrices[departure.id] ?? departure.pricePerPerson) }} / {{ priceLabel }}
+                    </div>
                   </v-sheet>
                 </v-col>
               </v-row>

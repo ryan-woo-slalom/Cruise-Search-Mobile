@@ -7,6 +7,12 @@ import ResultCard from '../components/ResultCard.vue'
 import type { CruiseDeparture, StateroomPricing } from '../types/cruise'
 
 type ViewMode = 'itinerary' | 'date'
+type PricingMode = 'person' | 'stateroom'
+
+type RoomConfig = {
+  adults: number
+  children: number
+}
 
 type ItineraryGroup = {
   itineraryName: string
@@ -25,8 +31,8 @@ const minNights = Math.min(...cruises.map((cruise) => cruise.nights))
 const maxNights = Math.max(...cruises.map((cruise) => cruise.nights))
 
 const searchQuery = ref('')
-const adultsCount = ref(2)
-const childrenCount = ref(0)
+const pricingMode = ref<PricingMode>('person')
+const staterooms = ref<RoomConfig[]>([{ adults: 2, children: 0 }])
 const selectedMonths = ref<string[]>([])
 const selectedShips = ref<string[]>([])
 const priceRange = ref<number[]>([minPrice, maxPrice])
@@ -59,9 +65,14 @@ const monthOptions = computed(() => {
 })
 
 const shipOptions = computed(() => [...new Set(cruises.map((cruise) => cruise.shipName))].sort())
-
-const totalGuests = computed(() => adultsCount.value + childrenCount.value)
-const guestSummary = computed(() => `${adultsCount.value} Adults, ${childrenCount.value} Children`)
+const stateroomCount = computed(() => staterooms.value.length)
+const totalAdults = computed(() => staterooms.value.reduce((sum, room) => sum + room.adults, 0))
+const totalChildren = computed(() => staterooms.value.reduce((sum, room) => sum + room.children, 0))
+const totalGuests = computed(() => totalAdults.value + totalChildren.value)
+const guestSummary = computed(
+  () => `${stateroomCount.value} staterooms • ${totalAdults.value} Adults, ${totalChildren.value} Children`,
+)
+const pricingLabel = computed(() => (pricingMode.value === 'person' ? 'person' : 'stateroom'))
 
 const filteredCruises = computed(() => {
   const query = searchQuery.value.trim().toLowerCase()
@@ -79,7 +90,7 @@ const filteredCruises = computed(() => {
       selectedMonths.value.length === 0 || selectedMonths.value.includes(cruiseMonth)
     const matchesShip =
       selectedShips.value.length === 0 || selectedShips.value.includes(cruise.shipName)
-    const adjustedPrice = adjustedPricePerPerson(cruise)
+    const adjustedPrice = pricingValue(cruise)
     const matchesPrice = adjustedPrice >= selectedMinPrice && adjustedPrice <= selectedMaxPrice
     const matchesNights =
       cruise.nights >= selectedMinNights && cruise.nights <= selectedMaxNights
@@ -159,8 +170,8 @@ const guestCalculatorTotal = computed(() => {
     return 0
   }
 
-  const baseStateroom = quickViewSelectedCruise.value.stateroomPricing[selectedStateroomType.value]
-  const extraGuests = Math.max(totalGuests.value - 2, 0)
+  const baseStateroom = quickViewSelectedCruise.value.stateroomPricing[selectedStateroomType.value] * stateroomCount.value
+  const extraGuests = staterooms.value.reduce((sum, room) => sum + Math.max(room.adults + room.children - 2, 0), 0)
   const extraGuestRate = Math.round(quickViewSelectedCruise.value.pricePerPerson * 0.75)
 
   return baseStateroom + extraGuests * extraGuestRate
@@ -170,38 +181,81 @@ const guestCalculatorPerGuest = computed(() =>
   Math.round(guestCalculatorTotal.value / totalGuests.value),
 )
 
-function adjustedPricePerPerson(cruise: CruiseDeparture): number {
-  const extraAdults = Math.max(adultsCount.value - 2, 0)
-  const extraChildren = childrenCount.value
-  const total = cruise.totalBasePrice + cruise.pricePerPerson * extraAdults * 0.85 + cruise.pricePerPerson * extraChildren * 0.6
+function totalCruisePrice(cruise: CruiseDeparture): number {
+  return staterooms.value.reduce((sum, room) => {
+    const roomGuests = room.adults + room.children
+    const extraAdults = Math.max(room.adults - 2, 0)
+    const extraChildren = room.children
+    const roomTotal =
+      cruise.totalBasePrice +
+      cruise.pricePerPerson * extraAdults * 0.85 +
+      cruise.pricePerPerson * extraChildren * 0.6 +
+      (roomGuests < 2 ? cruise.pricePerPerson * 0.5 : 0)
+
+    return sum + roomTotal
+  }, 0)
+}
+
+function pricingValue(cruise: CruiseDeparture): number {
+  const total = totalCruisePrice(cruise)
+  if (pricingMode.value === 'stateroom') {
+    return Math.round(total / stateroomCount.value)
+  }
+
   return Math.round(total / totalGuests.value)
 }
 
-function incrementAdults(): void {
-  if (totalGuests.value < 4) {
-    adultsCount.value += 1
+function addStateroom(): void {
+  staterooms.value.push({ adults: 2, children: 0 })
+}
+
+function removeStateroom(index: number): void {
+  if (staterooms.value.length > 1) {
+    staterooms.value.splice(index, 1)
   }
 }
 
-function decrementAdults(): void {
-  const minimumAdults = childrenCount.value > 0 ? 1 : 1
-  if (adultsCount.value > minimumAdults) {
-    adultsCount.value -= 1
+function incrementAdults(index: number): void {
+  const room = staterooms.value[index]
+  if (!room) {
+    return
+  }
+
+  if (room.adults + room.children < 4) {
+    room.adults += 1
   }
 }
 
-function incrementChildren(): void {
-  if (totalGuests.value < 4) {
-    childrenCount.value += 1
-    if (adultsCount.value === 0) {
-      adultsCount.value = 1
-    }
+function decrementAdults(index: number): void {
+  const room = staterooms.value[index]
+  if (!room) {
+    return
+  }
+
+  if (room.adults > 1) {
+    room.adults -= 1
   }
 }
 
-function decrementChildren(): void {
-  if (childrenCount.value > 0) {
-    childrenCount.value -= 1
+function incrementChildren(index: number): void {
+  const room = staterooms.value[index]
+  if (!room) {
+    return
+  }
+
+  if (room.adults + room.children < 4) {
+    room.children += 1
+  }
+}
+
+function decrementChildren(index: number): void {
+  const room = staterooms.value[index]
+  if (!room) {
+    return
+  }
+
+  if (room.children > 0) {
+    room.children -= 1
   }
 }
 
@@ -272,30 +326,46 @@ function destinationImage(destination: string): string {
           </v-col>
           <v-col cols="12" md="4">
             <v-card variant="outlined" class="pa-3 pa-md-4 guest-panel h-100">
-              <div class="text-subtitle-2 mb-2">Guests</div>
-              <div class="d-flex justify-space-between align-center mb-3">
-                <div>
-                  <div class="text-body-2 font-weight-medium">Adults</div>
-                  <div class="text-caption text-medium-emphasis">Ages 18+</div>
-                </div>
-                <div class="d-flex align-center ga-2">
-                  <v-btn icon="mdi-minus" size="x-small" variant="tonal" @click="decrementAdults" />
-                  <strong>{{ adultsCount }}</strong>
-                  <v-btn icon="mdi-plus" size="x-small" variant="tonal" @click="incrementAdults" />
-                </div>
-              </div>
               <div class="d-flex justify-space-between align-center mb-2">
-                <div>
-                  <div class="text-body-2 font-weight-medium">Children</div>
-                  <div class="text-caption text-medium-emphasis">Under 18</div>
-                </div>
-                <div class="d-flex align-center ga-2">
-                  <v-btn icon="mdi-minus" size="x-small" variant="tonal" @click="decrementChildren" />
-                  <strong>{{ childrenCount }}</strong>
-                  <v-btn icon="mdi-plus" size="x-small" variant="tonal" @click="incrementChildren" />
+                <div class="text-subtitle-2">Staterooms</div>
+                <div class="d-flex ga-1">
+                  <v-btn icon="mdi-minus" size="x-small" variant="tonal" :disabled="stateroomCount <= 1" @click="removeStateroom(staterooms.length - 1)" />
+                  <v-btn icon="mdi-plus" size="x-small" variant="tonal" @click="addStateroom" />
                 </div>
               </div>
-              <p class="text-caption text-medium-emphasis mb-0">{{ guestSummary }} • Max 4 guests per stateroom.</p>
+
+              <v-expansion-panels variant="accordion">
+                <v-expansion-panel v-for="(room, index) in staterooms" :key="index" :title="`Stateroom ${index + 1}`" rounded="lg">
+                  <v-expansion-panel-text>
+                    <div class="d-flex justify-space-between align-center mb-3">
+                      <div>
+                        <div class="text-body-2 font-weight-medium">Adults</div>
+                        <div class="text-caption text-medium-emphasis">Ages 18+</div>
+                      </div>
+                      <div class="d-flex align-center ga-2">
+                        <v-btn icon="mdi-minus" size="x-small" variant="tonal" @click="decrementAdults(index)" />
+                        <strong>{{ room.adults }}</strong>
+                        <v-btn icon="mdi-plus" size="x-small" variant="tonal" @click="incrementAdults(index)" />
+                      </div>
+                    </div>
+
+                    <div class="d-flex justify-space-between align-center">
+                      <div>
+                        <div class="text-body-2 font-weight-medium">Children</div>
+                        <div class="text-caption text-medium-emphasis">Under 18</div>
+                      </div>
+                      <div class="d-flex align-center ga-2">
+                        <v-btn icon="mdi-minus" size="x-small" variant="tonal" @click="decrementChildren(index)" />
+                        <strong>{{ room.children }}</strong>
+                        <v-btn icon="mdi-plus" size="x-small" variant="tonal" @click="incrementChildren(index)" />
+                      </div>
+                    </div>
+                    <p class="text-caption text-medium-emphasis mt-2 mb-0">Max 4 guests per stateroom and at least 1 adult.</p>
+                  </v-expansion-panel-text>
+                </v-expansion-panel>
+              </v-expansion-panels>
+
+              <p class="text-caption text-medium-emphasis mt-2 mb-0">{{ guestSummary }}</p>
             </v-card>
           </v-col>
         </v-row>
@@ -345,6 +415,11 @@ function destinationImage(destination: string): string {
             <v-btn value="date">View by Cruise Date</v-btn>
           </v-btn-toggle>
 
+          <v-btn-toggle v-model="pricingMode" mandatory color="secondary" divided rounded="pill">
+            <v-btn value="stateroom">Pricing by Stateroom</v-btn>
+            <v-btn value="person">Pricing by Person</v-btn>
+          </v-btn-toggle>
+
           <v-chip color="secondary" variant="tonal" prepend-icon="mdi-ferry">
             {{ filteredCruises.length }} cruise dates found
           </v-chip>
@@ -365,7 +440,9 @@ function destinationImage(destination: string): string {
               :image-url="destinationImage(group.leadDeparture.itineraryMap.split('->')[1]?.trim() ?? group.leadDeparture.itineraryName)"
               :is-saved="savedIds.includes(group.leadDeparture.id)"
               :is-compared="compareIds.includes(group.leadDeparture.id)"
-              :adjusted-price-per-person="adjustedPricePerPerson(group.leadDeparture)"
+              :display-price="pricingValue(group.leadDeparture)"
+              :price-label="pricingLabel"
+              :departure-prices="Object.fromEntries(group.departures.map((item) => [item.id, pricingValue(item)]))"
               @save="toggleSaved"
               @compare="toggleCompare"
               @quickview="openQuickView"
@@ -381,7 +458,8 @@ function destinationImage(destination: string): string {
               :image-url="destinationImage(cruise.itineraryMap.split('->')[1]?.trim() ?? cruise.itineraryName)"
               :is-saved="savedIds.includes(cruise.id)"
               :is-compared="compareIds.includes(cruise.id)"
-              :adjusted-price-per-person="adjustedPricePerPerson(cruise)"
+              :display-price="pricingValue(cruise)"
+              :price-label="pricingLabel"
               @save="toggleSaved"
               @compare="toggleCompare"
               @quickview="openQuickView"
@@ -401,7 +479,7 @@ function destinationImage(destination: string): string {
                 <th>Itinerary</th>
                 <th>Ship</th>
                 <th>Dates</th>
-                <th>Price / person</th>
+                <th>Price / {{ pricingLabel }}</th>
               </tr>
             </thead>
             <tbody>
@@ -409,7 +487,7 @@ function destinationImage(destination: string): string {
                 <td>{{ cruise.itineraryName }}</td>
                 <td>{{ cruise.shipName }}</td>
                 <td>{{ formatDate(cruise.startDate) }} - {{ formatDate(cruise.endDate) }}</td>
-                <td>{{ formatCurrency(adjustedPricePerPerson(cruise)) }}</td>
+                <td>{{ formatCurrency(pricingValue(cruise)) }}</td>
               </tr>
             </tbody>
           </v-table>
@@ -505,7 +583,7 @@ function destinationImage(destination: string): string {
                     { title: 'Suite', value: 'suite' },
                   ]"
                 />
-                <p class="text-caption text-medium-emphasis mt-3 mb-0">Using global guest selection: {{ guestSummary }}</p>
+                <p class="text-caption text-medium-emphasis mt-3 mb-0">Using global stateroom and guest selection: {{ guestSummary }}</p>
 
                 <v-divider class="my-4" />
 
