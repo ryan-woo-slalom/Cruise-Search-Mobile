@@ -63,7 +63,7 @@ const isDesktop = computed(() => mdAndUp.value)
         </template>
         <v-list density="compact">
           <v-list-item title="My Profile" />
-          <v-list-item title="Saved Cruises" />
+          <v-list-item title="Saved Cruises" to="/saved-cruises" />
           <v-list-item title="Sign Out" />
         </v-list>
       </v-menu>

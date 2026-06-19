@@ -59,8 +59,12 @@ Generate a fake dataset as a JSON file (src/data/metrics) with cruise data from 
     - Should contain the cruise itinerary
     - Should include information and highlights about the ship
     - Should include highlighted destinations
-    - Should include a date selector
-    - Should include a pricing calculator based off the global "Guests" control as reference
+    - Should include a cruise date selector
+    - Should include a pricing calculator:
+        - User should be able to add and remove staterooms, select a type of stateroom, and then configure the number of guests in that stateroom
+        - Receive a price per stateroom and per person for their number of staterooms and guests 
+    - Should have a Save (Heart) button that saves the user's cruise configuration to their Saved Cruises page
+    - Should have a "Compare" button that allows the user to compare this cruise with other cruises
     - Should have a "Close" button that closes the modal
     - Should have a "Book now" button that takes user into the booking flow
 

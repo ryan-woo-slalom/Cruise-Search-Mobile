@@ -4,7 +4,9 @@ import { useDisplay } from 'vuetify'
 import cruiseData from '../data/metrics.json'
 import CruiseFilters from '../components/CruiseFilters.vue'
 import ResultCard from '../components/ResultCard.vue'
+import { useSavedCruises } from '../composables/useSavedCruises'
 import type { CruiseDeparture, StateroomPricing } from '../types/cruise'
+import type { SavedCruiseConfig } from '../types/savedCruise'
 
 type ViewMode = 'itinerary' | 'date'
 type PricingMode = 'person' | 'stateroom'
@@ -13,6 +15,10 @@ type SortMode = 'recommended' | 'highestRated' | 'priceLowHigh' | 'priceHighLow'
 type RoomConfig = {
   adults: number
   children: number
+}
+
+type QuickViewRoomConfig = RoomConfig & {
+  stateroomType: keyof StateroomPricing
 }
 
 type ItineraryGroup = {
@@ -49,9 +55,12 @@ const quickViewOpen = ref(false)
 const quickViewTitle = ref('')
 const quickViewCruises = ref<CruiseDeparture[]>([])
 const selectedQuickViewDateId = ref('')
-const selectedStateroomType = ref<keyof StateroomPricing>('interior')
+const quickViewStaterooms = ref<QuickViewRoomConfig[]>([
+  { adults: 2, children: 0, stateroomType: 'interior' },
+])
 const comparePanelCollapsed = ref(false)
 const compareModuleOpen = ref(false)
+const { addSavedCruise } = useSavedCruises()
 
 const monthFormatter = new Intl.DateTimeFormat('en-US', { month: 'long', year: 'numeric' })
 const dateFormatter = new Intl.DateTimeFormat('en-US', {
@@ -75,6 +84,13 @@ const totalChildren = computed(() => staterooms.value.reduce((sum, room) => sum 
 const totalGuests = computed(() => totalAdults.value + totalChildren.value)
 const guestSummary = computed(
   () => `${stateroomCount.value} staterooms • ${totalAdults.value} Adults, ${totalChildren.value} Children`,
+)
+const quickViewStateroomCount = computed(() => quickViewStaterooms.value.length)
+const quickViewTotalAdults = computed(() => quickViewStaterooms.value.reduce((sum, room) => sum + room.adults, 0))
+const quickViewTotalChildren = computed(() => quickViewStaterooms.value.reduce((sum, room) => sum + room.children, 0))
+const quickViewTotalGuests = computed(() => quickViewTotalAdults.value + quickViewTotalChildren.value)
+const quickViewGuestSummary = computed(
+  () => `${quickViewStateroomCount.value} staterooms • ${quickViewTotalAdults.value} Adults, ${quickViewTotalChildren.value} Children`,
 )
 const pricingLabel = computed(() => (pricingMode.value === 'person' ? 'person' : 'stateroom'))
 const resultsCount = computed(() =>
@@ -254,20 +270,44 @@ const quickViewShipHighlights = computed(() => {
   return shipHighlights[quickViewSelectedCruise.value.shipName] ?? ['Signature dining', 'Live entertainment', 'Wellness centre']
 })
 
+const quickViewSelectionSaved = computed(() => {
+  if (!quickViewSelectedCruise.value) {
+    return false
+  }
+
+  return savedIds.value.includes(quickViewSelectedCruise.value.id)
+})
+
+const quickViewSelectionCompared = computed(() => {
+  if (!quickViewSelectedCruise.value) {
+    return false
+  }
+
+  return compareIds.value.includes(quickViewSelectedCruise.value.id)
+})
+
 const guestCalculatorTotal = computed(() => {
   if (!quickViewSelectedCruise.value) {
     return 0
   }
 
-  const baseStateroom = quickViewSelectedCruise.value.stateroomPricing[selectedStateroomType.value] * stateroomCount.value
-  const extraGuests = staterooms.value.reduce((sum, room) => sum + Math.max(room.adults + room.children - 2, 0), 0)
+  const baseStateroom = quickViewStaterooms.value.reduce((sum, room) => {
+    return sum + quickViewSelectedCruise.value!.stateroomPricing[room.stateroomType]
+  }, 0)
+  const extraGuests = quickViewStaterooms.value.reduce((sum, room) => {
+    return sum + Math.max(room.adults + room.children - 2, 0)
+  }, 0)
   const extraGuestRate = Math.round(quickViewSelectedCruise.value.pricePerPerson * 0.75)
 
   return baseStateroom + extraGuests * extraGuestRate
 })
 
 const guestCalculatorPerGuest = computed(() =>
-  Math.round(guestCalculatorTotal.value / totalGuests.value),
+  Math.round(guestCalculatorTotal.value / Math.max(quickViewTotalGuests.value, 1)),
+)
+
+const guestCalculatorPerStateroom = computed(() =>
+  Math.round(guestCalculatorTotal.value / Math.max(quickViewStateroomCount.value, 1)),
 )
 
 function totalCruisePrice(cruise: CruiseDeparture): number {
@@ -360,6 +400,17 @@ function formatDate(date: string): string {
   return dateFormatter.format(new Date(date))
 }
 
+function stateroomTypeLabel(type: keyof StateroomPricing): string {
+  const labels: Record<keyof StateroomPricing, string> = {
+    interior: 'Interior',
+    oceanview: 'Oceanview',
+    balcony: 'Balcony',
+    suite: 'Suite',
+  }
+
+  return labels[type]
+}
+
 function toggleSaved(id: string): void {
   savedIds.value = savedIds.value.includes(id)
     ? savedIds.value.filter((item) => item !== id)
@@ -390,8 +441,118 @@ function openQuickView(cruiseSet: CruiseDeparture[], title: string): void {
   quickViewCruises.value = cruiseSet
   quickViewTitle.value = title
   selectedQuickViewDateId.value = cruiseSet[0]?.id ?? ''
-  selectedStateroomType.value = 'interior'
+  quickViewStaterooms.value = staterooms.value.map((room) => ({
+    adults: room.adults,
+    children: room.children,
+    stateroomType: 'interior',
+  }))
   quickViewOpen.value = true
+}
+
+function addQuickViewStateroom(): void {
+  quickViewStaterooms.value.push({ adults: 2, children: 0, stateroomType: 'interior' })
+}
+
+function removeQuickViewStateroom(index: number): void {
+  if (quickViewStaterooms.value.length > 1) {
+    quickViewStaterooms.value.splice(index, 1)
+  }
+}
+
+function incrementQuickViewAdults(index: number): void {
+  const room = quickViewStaterooms.value[index]
+  if (!room) {
+    return
+  }
+
+  if (room.adults + room.children < 4) {
+    room.adults += 1
+  }
+}
+
+function decrementQuickViewAdults(index: number): void {
+  const room = quickViewStaterooms.value[index]
+  if (!room) {
+    return
+  }
+
+  if (room.adults > 1) {
+    room.adults -= 1
+  }
+}
+
+function incrementQuickViewChildren(index: number): void {
+  const room = quickViewStaterooms.value[index]
+  if (!room) {
+    return
+  }
+
+  if (room.adults + room.children < 4) {
+    room.children += 1
+  }
+}
+
+function decrementQuickViewChildren(index: number): void {
+  const room = quickViewStaterooms.value[index]
+  if (!room) {
+    return
+  }
+
+  if (room.children > 0) {
+    room.children -= 1
+  }
+}
+
+function toggleQuickViewSaved(): void {
+  if (!quickViewSelectedCruise.value) {
+    return
+  }
+
+  toggleSaved(quickViewSelectedCruise.value.id)
+}
+
+function toggleQuickViewCompare(): void {
+  if (!quickViewSelectedCruise.value) {
+    return
+  }
+
+  toggleCompare(quickViewSelectedCruise.value.id)
+}
+
+function saveQuickViewCruise(): void {
+  if (!quickViewSelectedCruise.value) {
+    return
+  }
+
+  const cruise = quickViewSelectedCruise.value
+  const destination = cruise.itineraryMap.split('->')[1]?.trim() ?? cruise.itineraryName
+
+  const savedConfig: SavedCruiseConfig = {
+    id: `${cruise.id}-${Date.now()}`,
+    cruiseId: cruise.id,
+    itineraryName: cruise.itineraryName,
+    itineraryMap: cruise.itineraryMap,
+    shipName: cruise.shipName,
+    startDate: cruise.startDate,
+    endDate: cruise.endDate,
+    nights: cruise.nights,
+    imageUrl: destinationImage(destination),
+    staterooms: quickViewStaterooms.value.map((room) => ({
+      adults: room.adults,
+      children: room.children,
+      stateroomType: room.stateroomType,
+    })),
+    totalPrice: guestCalculatorTotal.value,
+    pricePerStateroom: guestCalculatorPerStateroom.value,
+    pricePerPerson: guestCalculatorPerGuest.value,
+    savedAt: new Date().toISOString(),
+  }
+
+  addSavedCruise(savedConfig)
+
+  if (!savedIds.value.includes(cruise.id)) {
+    savedIds.value = [...savedIds.value, cruise.id]
+  }
 }
 
 function destinationImage(destination: string): string {
@@ -519,7 +680,7 @@ const compareRows = computed(() => [
             Filters
           </v-card-title>
           <v-divider />
-          <v-card-text>
+          <v-card-text class="pa-0">
             <CruiseFilters
               v-model:selected-months="selectedMonths"
               v-model:selected-ships="selectedShips"
@@ -551,18 +712,32 @@ const compareRows = computed(() => [
 
           <div class="control-group">
             <span class="control-label">View by</span>
-            <v-btn-toggle v-model="activeView" mandatory divided rounded="pill" density="comfortable">
-              <v-btn value="itinerary" size="small">Itinerary</v-btn>
-              <v-btn value="date" size="small">Cruise Date</v-btn>
-            </v-btn-toggle>
+            <v-select
+              v-model="activeView"
+              :items="[
+                { title: 'Itinerary', value: 'itinerary' },
+                { title: 'Cruise Date', value: 'date' },
+              ]"
+              variant="outlined"
+              density="compact"
+              hide-details
+              class="control-select"
+            />
           </div>
 
           <div class="control-group">
             <span class="control-label">Pricing by</span>
-            <v-btn-toggle v-model="pricingMode" mandatory divided rounded="pill" density="comfortable">
-              <v-btn value="stateroom" size="small">Per Stateroom</v-btn>
-              <v-btn value="person" size="small">Per Person</v-btn>
-            </v-btn-toggle>
+            <v-select
+              v-model="pricingMode"
+              :items="[
+                { title: 'Per Stateroom', value: 'stateroom' },
+                { title: 'Per Person', value: 'person' },
+              ]"
+              variant="outlined"
+              density="compact"
+              hide-details
+              class="control-select"
+            />
           </div>
 
           <div class="control-group sort-control">
@@ -678,7 +853,7 @@ const compareRows = computed(() => [
           <v-spacer />
           <v-btn icon="mdi-close" variant="text" @click="mobileFiltersOpen = false" />
         </v-toolbar>
-        <v-card-text>
+        <v-card-text class="pa-0">
           <CruiseFilters
             v-model:selected-months="selectedMonths"
             v-model:selected-ships="selectedShips"
@@ -702,22 +877,34 @@ const compareRows = computed(() => [
             <p class="text-overline mb-0 text-medium-emphasis">Quick View</p>
             <span>{{ quickViewTitle }}</span>
           </div>
-          <v-btn icon="mdi-close" variant="text" @click="quickViewOpen = false" />
+          <div class="d-flex align-center ga-2">
+            <v-btn
+              icon
+              variant="tonal"
+              size="small"
+              :color="quickViewSelectionSaved ? 'secondary' : 'default'"
+              :aria-label="quickViewSelectionSaved ? 'Remove from favorites' : 'Save to favorites'"
+              @click="toggleQuickViewSaved"
+            >
+              <v-icon :icon="quickViewSelectionSaved ? 'mdi-heart' : 'mdi-heart-outline'" />
+            </v-btn>
+            <v-btn
+              size="small"
+              variant="tonal"
+              :prepend-icon="quickViewSelectionCompared ? 'mdi-checkbox-marked' : 'mdi-checkbox-blank-outline'"
+              :color="quickViewSelectionCompared ? 'secondary' : 'default'"
+              @click="toggleQuickViewCompare"
+            >
+              Compare
+            </v-btn>
+            <v-btn icon="mdi-close" variant="text" @click="quickViewOpen = false" />
+          </div>
         </v-card-title>
         <v-divider />
         <v-card-text class="pa-4 pa-sm-5">
           <v-row class="quickview-grid">
             <v-col cols="12" md="7">
               <h3 class="text-subtitle-1 font-weight-bold mb-3">Cruise itinerary</h3>
-              <v-select
-                v-model="selectedQuickViewDateId"
-                label="Cruise date"
-                variant="outlined"
-                density="comfortable"
-                class="mb-4"
-                :items="quickViewCruises.map((item) => ({ title: `${formatDate(item.startDate)} - ${formatDate(item.endDate)}`, value: item.id }))"
-              />
-
               <v-sheet rounded="lg" class="pa-4 mb-4 itinerary-summary section-surface">
                 <p class="text-body-2 mb-2"><strong>Route:</strong> {{ quickViewSelectedCruise?.itineraryMap }}</p>
                 <p class="text-body-2 mb-0">
@@ -726,6 +913,16 @@ const compareRows = computed(() => [
                   <strong>Nights:</strong> {{ quickViewSelectedCruise?.nights }}
                 </p>
               </v-sheet>
+
+              <h4 class="text-subtitle-2 font-weight-bold mb-2">Ship highlights</h4>
+              <v-list density="compact" class="mb-4 bg-transparent section-surface" rounded="lg">
+                <v-list-item
+                  v-for="highlight in quickViewShipHighlights"
+                  :key="highlight"
+                  :title="highlight"
+                  prepend-icon="mdi-star-four-points"
+                />
+              </v-list>
 
               <h4 class="text-subtitle-2 font-weight-bold mb-2">Highlighted destinations</h4>
               <v-row>
@@ -740,35 +937,137 @@ const compareRows = computed(() => [
 
             <v-col cols="12" md="5">
               <v-sheet rounded="lg" class="pa-4 calculator-shell section-surface">
-                <h3 class="text-subtitle-1 font-weight-bold mb-3">Ship highlights</h3>
-                <v-list density="compact" class="mb-4 bg-transparent">
-                  <v-list-item v-for="highlight in quickViewShipHighlights" :key="highlight" :title="highlight" prepend-icon="mdi-star-four-points" />
-                </v-list>
-
-                <h3 class="text-subtitle-1 font-weight-bold mb-3">Pricing calculator</h3>
                 <v-select
-                  v-model="selectedStateroomType"
-                  label="Stateroom"
+                  v-model="selectedQuickViewDateId"
+                  label="Cruise date"
                   variant="outlined"
                   density="comfortable"
-                  hide-details
-                  :items="[
-                    { title: 'Interior', value: 'interior' },
-                    { title: 'Oceanview', value: 'oceanview' },
-                    { title: 'Balcony', value: 'balcony' },
-                    { title: 'Suite', value: 'suite' },
-                  ]"
+                  class="mb-4"
+                  :items="quickViewCruises.map((item) => ({ title: `${formatDate(item.startDate)} - ${formatDate(item.endDate)}`, value: item.id }))"
                 />
-                <p class="text-caption text-medium-emphasis mt-3 mb-0">Using global stateroom and guest selection: {{ guestSummary }}</p>
+
+                <div class="d-flex align-center justify-space-between mb-3 ga-2 flex-wrap">
+                  <h3 class="text-subtitle-1 font-weight-bold mb-0">Configure your cruise</h3>
+                  <v-btn
+                    size="small"
+                    variant="outlined"
+                    prepend-icon="mdi-plus"
+                    @click="addQuickViewStateroom"
+                  >
+                    Add a stateroom
+                  </v-btn>
+                </div>
+
+                <v-btn
+                  color="secondary"
+                  variant="tonal"
+                  prepend-icon="mdi-heart"
+                  class="mb-3"
+                  block
+                  @click="saveQuickViewCruise"
+                >
+                  Save cruise
+                </v-btn>
+
+                <v-expansion-panels variant="accordion" class="mb-3">
+                  <v-expansion-panel
+                    v-for="(room, index) in quickViewStaterooms"
+                    :key="`quick-room-${index}`"
+                    rounded="lg"
+                  >
+                    <template #title>
+                      <div class="room-header-wrap">
+                        <span class="font-weight-medium">Stateroom {{ index + 1 }}</span>
+                        <span class="text-caption text-medium-emphasis">
+                          {{ room.adults }} Adults, {{ room.children }} Children • {{ stateroomTypeLabel(room.stateroomType) }}
+                        </span>
+                      </div>
+                    </template>
+                    <v-expansion-panel-text>
+                      <div class="d-flex justify-space-between align-center mb-2">
+                        <span class="text-body-2 font-weight-medium">Adults</span>
+                        <div class="d-flex align-center ga-2">
+                          <v-btn
+                            icon="mdi-minus"
+                            size="x-small"
+                            variant="tonal"
+                            @click="decrementQuickViewAdults(index)"
+                          />
+                          <strong>{{ room.adults }}</strong>
+                          <v-btn
+                            icon="mdi-plus"
+                            size="x-small"
+                            variant="tonal"
+                            @click="incrementQuickViewAdults(index)"
+                          />
+                        </div>
+                      </div>
+
+                      <div class="d-flex justify-space-between align-center mb-3">
+                        <span class="text-body-2 font-weight-medium">Children</span>
+                        <div class="d-flex align-center ga-2">
+                          <v-btn
+                            icon="mdi-minus"
+                            size="x-small"
+                            variant="tonal"
+                            @click="decrementQuickViewChildren(index)"
+                          />
+                          <strong>{{ room.children }}</strong>
+                          <v-btn
+                            icon="mdi-plus"
+                            size="x-small"
+                            variant="tonal"
+                            @click="incrementQuickViewChildren(index)"
+                          />
+                        </div>
+                      </div>
+
+                      <v-select
+                        v-model="room.stateroomType"
+                        label="Stateroom type"
+                        variant="outlined"
+                        density="compact"
+                        hide-details
+                        class="mb-3"
+                        :items="[
+                          { title: 'Interior', value: 'interior' },
+                          { title: 'Oceanview', value: 'oceanview' },
+                          { title: 'Balcony', value: 'balcony' },
+                          { title: 'Suite', value: 'suite' },
+                        ]"
+                      />
+
+                      <v-btn
+                        size="x-small"
+                        variant="text"
+                        color="secondary"
+                        :disabled="quickViewStateroomCount <= 1"
+                        @click="removeQuickViewStateroom(index)"
+                      >
+                        Remove stateroom
+                      </v-btn>
+                    </v-expansion-panel-text>
+                  </v-expansion-panel>
+                </v-expansion-panels>
+                <p class="text-caption text-medium-emphasis mt-3 mb-0">
+                  Quick view selection: {{ quickViewGuestSummary }}
+                </p>
+                <p class="text-caption text-medium-emphasis mt-1 mb-0">
+                  Max 4 guests per stateroom and at least 1 adult.
+                </p>
 
                 <v-divider class="my-4" />
 
                 <div class="d-flex justify-space-between text-body-2 mb-2 price-row">
-                  <span>Estimated stateroom total</span>
+                  <span>Estimated total</span>
                   <strong>{{ formatCurrency(guestCalculatorTotal) }}</strong>
                 </div>
+                <div class="d-flex justify-space-between text-body-2 mb-2 price-row">
+                  <span>Price per stateroom</span>
+                  <strong>{{ formatCurrency(guestCalculatorPerStateroom) }}</strong>
+                </div>
                 <div class="d-flex justify-space-between text-body-2 price-row">
-                  <span>Average per guest</span>
+                  <span>Price per person</span>
                   <strong>{{ formatCurrency(guestCalculatorPerGuest) }}</strong>
                 </div>
               </v-sheet>
@@ -878,6 +1177,10 @@ const compareRows = computed(() => [
   gap: 8px;
 }
 
+.control-select {
+  min-width: 150px;
+}
+
 .sort-control {
   margin-left: auto;
 }
@@ -962,6 +1265,12 @@ const compareRows = computed(() => [
   border: 1px solid #d5e4f3;
 }
 
+.room-header-wrap {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.25;
+}
+
 .compare-panel {
   border-top-left-radius: 18px;
   border-top-right-radius: 18px;
@@ -993,8 +1302,9 @@ const compareRows = computed(() => [
     margin-left: 0;
   }
 
-  .control-group :deep(.v-btn-toggle) {
+  .control-group :deep(.v-field) {
     margin-left: auto;
+    width: 100%;
   }
 
   .sort-control :deep(.v-field) {

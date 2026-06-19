@@ -111,10 +111,10 @@ function openQuickView(): void {
     </v-img>
 
     <v-card-text class="pa-4 pa-sm-5 pa-md-6 card-content">
-      <div class="d-flex justify-space-between ga-3 align-start mb-3">
-        <div>
-          <div class="d-flex align-center flex-wrap ga-2 mb-1">
-            <h2 class="text-subtitle-1 text-md-h6 font-weight-bold mb-0 card-title">{{ cruise.itineraryName }}</h2>
+      <div class="card-header mb-3">
+        <div class="title-rating-wrap">
+          <h2 class="text-subtitle-1 text-md-h6 font-weight-bold mb-0 card-title">{{ cruise.itineraryName }}</h2>
+          <div class="d-flex align-center ga-2 rating-wrap">
             <v-rating
               :model-value="reviewRating"
               color="amber"
@@ -125,17 +125,17 @@ function openQuickView(): void {
             />
             <span class="text-caption text-medium-emphasis">{{ reviewRating.toFixed(1) }} / 5</span>
           </div>
-          <p class="text-caption route-copy mb-2">{{ cruise.itineraryMap }}</p>
-          <p class="text-caption text-medium-emphasis mb-0 d-flex align-center ga-1">
-            <v-icon size="14" icon="mdi-calendar-range" />
-            {{ formatDate(earliestDate) }} to {{ formatDate(latestDate) }}
-          </p>
         </div>
         <div class="text-right price-wrap">
           <v-chip color="primary" variant="flat" size="small">{{ formatCurrency(displayPrice) }}</v-chip>
-          <div class="text-caption mt-1">{{ priceLabel }}</div>
+          <div class="text-caption mt-1">Starting from per {{ priceLabel }}</div>
         </div>
       </div>
+      <p class="text-caption route-copy mb-2">{{ cruise.itineraryMap }}</p>
+      <p class="text-caption text-medium-emphasis mb-0 d-flex align-center ga-1">
+        <v-icon size="14" icon="mdi-calendar-range" />
+        {{ formatDate(earliestDate) }} to {{ formatDate(latestDate) }}
+      </p>
 
       <template v-if="mode === 'itinerary'">
         <v-expansion-panels variant="accordion" class="mt-3 itinerary-expansion" flat>
@@ -229,6 +229,30 @@ function openQuickView(): void {
 
 .card-content {
   border-top: 1px solid #e4edf6;
+}
+
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.title-rating-wrap {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.rating-wrap {
+  min-width: fit-content;
+}
+
+.price-wrap {
+  min-width: fit-content;
 }
 
 .card-title {
