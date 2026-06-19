@@ -25,12 +25,25 @@ Generate a fake dataset as a JSON file (src/data/metrics) with cruise data from 
 - Long full-width Search input bar at the top of the page that allows users to do a keyword search. It should not be in the Filters.
 - Next to the Search input bar should be a Staterooms control where users can choose the number of staterooms for their cruise, and then also the number of guests per stateroom. Each stateroom should have an "Adults" and "Children" control. Maximum number of guests should be 4. With at least one Child, there must be at least one Adult. This "Guests" control changes the price per person calculation.
 - Filters on left rail (for desktop) and on a button (for mobile)
-- "Pricing by" button group: Per Stateroom and Per Person 
+    - Expanded accordion view of all filtering options
+- "Pricing by" button group: Per Stateroom and Per Person
+    - Pricing by Stateroom
+        - Refreshes the card to show the price by stateroom
+    - Pricing per Person
+        - Refreshes the card to show the price per person
 - "View by" button group: Itinerary and Cruise Date
     - Product cards by Itinerary
+        - Number of Itinerary search results should reflect the number of itineraries only
         - Users should be able to dig into each Itinerary to see a quick view of the cruise along with cruise dates that fall under that Itinerary
     - Product cards by Cruise Date
+        - Number of Cruise Date search results should reflect the number of cruise dates only
         - Users should be able to dig into each Cruise Date to see a quick view of the cruise along with stateroom pricing
+- Sorting dropdown that lets users sort the search results
+    - Sorting options:
+        - Recommended - Sorts based on knowledge about the user (Saved cruises, Location, etc)
+        - Highest Rated - Sorts by highest rated user-reviewed cruises
+        - Price: Low to High - Sorts by lowest price first
+        - Price: High to Low - Sorts by highest price first
 
 ### Body - Search Results
 - Have a section header separating the Search and Filter controls and the Search Results. This section header should keep a count of the search results.
@@ -38,6 +51,7 @@ Generate a fake dataset as a JSON file (src/data/metrics) with cruise data from 
     - Should represent the products and contain the Itinerary name, cruise dates, ship name, the itinerary map
     - "Save" button (Heart icon) to save to Favorites in the upper right of the card
     - "Compare" button (Checkbox with "Compare" label) to compare cruises in the upper right of the card
+    - Should have a user-reviewed stars rating out of 5 stars
     - Cruise cards should have a "Quick view" button to give an overview of the cruise
     - Cruise cards should have a "Book now" button that takes users into the booking flow
     - Cruise cards should have an image of the highlight destination in the itinerary
@@ -52,9 +66,9 @@ Generate a fake dataset as a JSON file (src/data/metrics) with cruise data from 
 
 ### Body - Features
 - Compare
-    - Once a cruise card is selected to be compared, a "Compare" panel should slide up from the bottom (maximum 4 selections)
-    - Should have a "Collapse" button to collapse the panel
-    - Should have a "Compare" button to open the Compare module that allows users to compare various aspects of the cruises
+    - Once a cruise card is selected to be compared, a "Compare" panel appear pinned at the bottom (maximum 4 selections)
+    - Should have an "Expand" button to expand and see the cruises selected to compare
+    - Should have a "Collapse" button to collapse the panel back to its pinned view
 
 ### Footer
 - Footer on bottom

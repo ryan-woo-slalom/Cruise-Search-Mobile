@@ -15,8 +15,13 @@ const nightsRange = defineModel<number[]>('nightsRange', { required: true })
 </script>
 
 <template>
-  <v-expansion-panels variant="accordion" class="filter-accordion">
-    <v-expansion-panel title="Sailing month">
+  <v-expansion-panels
+    variant="accordion"
+    class="filter-accordion"
+    multiple
+    :model-value="[0, 1, 2, 3]"
+  >
+    <v-expansion-panel class="filter-section" title="Sailing month">
       <v-expansion-panel-text>
         <v-select
           v-model="selectedMonths"
@@ -33,7 +38,7 @@ const nightsRange = defineModel<number[]>('nightsRange', { required: true })
       </v-expansion-panel-text>
     </v-expansion-panel>
 
-    <v-expansion-panel title="Ship">
+    <v-expansion-panel class="filter-section" title="Ship">
       <v-expansion-panel-text>
         <v-select
           v-model="selectedShips"
@@ -48,7 +53,7 @@ const nightsRange = defineModel<number[]>('nightsRange', { required: true })
       </v-expansion-panel-text>
     </v-expansion-panel>
 
-    <v-expansion-panel title="Price per person">
+    <v-expansion-panel class="filter-section" title="Price per person">
       <v-expansion-panel-text>
         <v-range-slider
           v-model="priceRange"
@@ -62,7 +67,7 @@ const nightsRange = defineModel<number[]>('nightsRange', { required: true })
       </v-expansion-panel-text>
     </v-expansion-panel>
 
-    <v-expansion-panel title="Cruise nights">
+    <v-expansion-panel class="filter-section" title="Cruise nights">
       <v-expansion-panel-text>
         <v-range-slider
           v-model="nightsRange"
@@ -80,8 +85,31 @@ const nightsRange = defineModel<number[]>('nightsRange', { required: true })
 
 <style scoped>
 .filter-accordion {
-  border-radius: 12px;
-  overflow: hidden;
-  border: 1px solid #dbe6f2;
+  border: 0;
+  border-radius: 0;
+  overflow: visible;
+}
+
+.filter-accordion :deep(.filter-section) {
+  background: transparent !important;
+  box-shadow: none !important;
+  border-radius: 0;
+  border: 0;
+  margin: 0;
+}
+
+.filter-accordion :deep(.filter-section .v-expansion-panel__shadow),
+.filter-accordion :deep(.filter-section::before),
+.filter-accordion :deep(.filter-section::after) {
+  display: none;
+}
+
+.filter-accordion :deep(.filter-section + .filter-section) {
+  border-top: 1px solid #dbe6f2;
+}
+
+.filter-accordion :deep(.filter-section .v-expansion-panel-title),
+.filter-accordion :deep(.filter-section .v-expansion-panel-text) {
+  background: transparent !important;
 }
 </style>

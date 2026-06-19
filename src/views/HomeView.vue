@@ -8,6 +8,7 @@ import type { CruiseDeparture, StateroomPricing } from '../types/cruise'
 
 type ViewMode = 'itinerary' | 'date'
 type PricingMode = 'person' | 'stateroom'
+type SortMode = 'recommended' | 'highestRated' | 'priceLowHigh' | 'priceHighLow'
 
 type RoomConfig = {
   adults: number
@@ -39,6 +40,7 @@ const priceRange = ref<number[]>([minPrice, maxPrice])
 const nightsRange = ref<number[]>([minNights, maxNights])
 const activeView = ref<ViewMode>('itinerary')
 const mobileFiltersOpen = ref(false)
+const sortMode = ref<SortMode>('recommended')
 
 const savedIds = ref<string[]>([])
 const compareIds = ref<string[]>([])
@@ -75,6 +77,16 @@ const guestSummary = computed(
   () => `${stateroomCount.value} staterooms • ${totalAdults.value} Adults, ${totalChildren.value} Children`,
 )
 const pricingLabel = computed(() => (pricingMode.value === 'person' ? 'person' : 'stateroom'))
+const resultsCount = computed(() =>
+  activeView.value === 'itinerary' ? sortedGroupedByItinerary.value.length : sortedFilteredCruises.value.length,
+)
+
+const sortOptions: { title: string; value: SortMode }[] = [
+  { title: 'Recommended', value: 'recommended' },
+  { title: 'Highest Rated', value: 'highestRated' },
+  { title: 'Price: Low to High', value: 'priceLowHigh' },
+  { title: 'Price: High to Low', value: 'priceHighLow' },
+]
 
 const filteredCruises = computed(() => {
   const query = searchQuery.value.trim().toLowerCase()
@@ -92,8 +104,9 @@ const filteredCruises = computed(() => {
       selectedMonths.value.length === 0 || selectedMonths.value.includes(cruiseMonth)
     const matchesShip =
       selectedShips.value.length === 0 || selectedShips.value.includes(cruise.shipName)
-    const adjustedPrice = pricingValue(cruise)
-    const matchesPrice = adjustedPrice >= selectedMinPrice && adjustedPrice <= selectedMaxPrice
+    // Keep filtering on a fixed per-person basis so pricing view mode does not change results.
+    const filterPrice = cruise.pricePerPerson
+    const matchesPrice = filterPrice >= selectedMinPrice && filterPrice <= selectedMaxPrice
     const matchesNights =
       cruise.nights >= selectedMinNights && cruise.nights <= selectedMaxNights
 
@@ -124,6 +137,80 @@ const groupedByItinerary = computed<ItineraryGroup[]>(() => {
     const aDate = a.departures[0]?.startDate ?? ''
     const bDate = b.departures[0]?.startDate ?? ''
     return aDate.localeCompare(bDate)
+  })
+})
+
+function cruiseRatingValue(id: string): number {
+  const hash = [...id].reduce((sum, char) => sum + char.charCodeAt(0), 0)
+  return Number((3.8 + (hash % 12) * 0.1).toFixed(1))
+}
+
+function cruiseRating(cruise: CruiseDeparture): number {
+  return cruiseRatingValue(cruise.id)
+}
+
+function itineraryRating(group: ItineraryGroup): number {
+  const total = group.departures.reduce((sum, departure) => sum + cruiseRating(departure), 0)
+  return Number((total / group.departures.length).toFixed(1))
+}
+
+function compareBySortMode(a: CruiseDeparture, b: CruiseDeparture): number {
+  if (sortMode.value === 'highestRated') {
+    return cruiseRating(b) - cruiseRating(a)
+  }
+
+  if (sortMode.value === 'priceLowHigh') {
+    return pricingValue(a) - pricingValue(b)
+  }
+
+  if (sortMode.value === 'priceHighLow') {
+    return pricingValue(b) - pricingValue(a)
+  }
+
+  const aSaved = savedIds.value.includes(a.id)
+  const bSaved = savedIds.value.includes(b.id)
+  if (aSaved !== bSaved) {
+    return aSaved ? -1 : 1
+  }
+
+  const ratingDiff = cruiseRating(b) - cruiseRating(a)
+  if (ratingDiff !== 0) {
+    return ratingDiff
+  }
+
+  return pricingValue(a) - pricingValue(b)
+}
+
+const sortedFilteredCruises = computed(() => [...filteredCruises.value].sort(compareBySortMode))
+
+const sortedGroupedByItinerary = computed(() => {
+  const groups = [...groupedByItinerary.value]
+
+  return groups.sort((a, b) => {
+    if (sortMode.value === 'highestRated') {
+      return itineraryRating(b) - itineraryRating(a)
+    }
+
+    if (sortMode.value === 'priceLowHigh') {
+      return pricingValue(a.leadDeparture) - pricingValue(b.leadDeparture)
+    }
+
+    if (sortMode.value === 'priceHighLow') {
+      return pricingValue(b.leadDeparture) - pricingValue(a.leadDeparture)
+    }
+
+    const aSaved = a.departures.some((departure) => savedIds.value.includes(departure.id))
+    const bSaved = b.departures.some((departure) => savedIds.value.includes(departure.id))
+    if (aSaved !== bSaved) {
+      return aSaved ? -1 : 1
+    }
+
+    const ratingDiff = itineraryRating(b) - itineraryRating(a)
+    if (ratingDiff !== 0) {
+      return ratingDiff
+    }
+
+    return pricingValue(a.leadDeparture) - pricingValue(b.leadDeparture)
   })
 })
 
@@ -319,12 +406,14 @@ function closeComparePanel(): void {
   comparePanelCollapsed.value = true
 }
 
+function expandComparePanel(): void {
+  comparePanelCollapsed.value = false
+}
+
 function clearCompareSelections(): void {
   compareIds.value = []
   comparePanelCollapsed.value = true
 }
-
-const comparePanelVisible = computed(() => compareIds.value.length > 0 && !comparePanelCollapsed.value)
 
 const compareRows = computed(() => [
   {
@@ -460,33 +549,31 @@ const compareRows = computed(() => [
             Filters
           </v-btn>
 
-          <div class="dropdown-control">
+          <div class="control-group">
             <span class="control-label">View by</span>
-            <v-select
-              v-model="activeView"
-              :items="[
-                { title: 'Itinerary', value: 'itinerary' },
-                { title: 'Cruise Date', value: 'date' },
-              ]"
-              variant="outlined"
-              density="compact"
-              hide-details
-              class="control-select"
-            />
+            <v-btn-toggle v-model="activeView" mandatory divided rounded="pill" density="comfortable">
+              <v-btn value="itinerary" size="small">Itinerary</v-btn>
+              <v-btn value="date" size="small">Cruise Date</v-btn>
+            </v-btn-toggle>
           </div>
 
-          <div class="dropdown-control">
+          <div class="control-group">
             <span class="control-label">Pricing by</span>
+            <v-btn-toggle v-model="pricingMode" mandatory divided rounded="pill" density="comfortable">
+              <v-btn value="stateroom" size="small">Per Stateroom</v-btn>
+              <v-btn value="person" size="small">Per Person</v-btn>
+            </v-btn-toggle>
+          </div>
+
+          <div class="control-group sort-control">
+            <span class="control-label">Sort by</span>
             <v-select
-              v-model="pricingMode"
-              :items="[
-                { title: 'Per Stateroom', value: 'stateroom' },
-                { title: 'Per Person', value: 'person' },
-              ]"
+              v-model="sortMode"
+              :items="sortOptions"
               variant="outlined"
               density="compact"
               hide-details
-              class="control-select"
+              class="sort-select"
             />
           </div>
           </v-card-text>
@@ -494,11 +581,11 @@ const compareRows = computed(() => [
 
         <div class="results-header mb-3">
           <p class="text-overline mb-1 section-kicker">Search Results</p>
-          <h2 class="text-h6 mb-0">Cruises matching your search ({{ filteredCruises.length }})</h2>
+          <h2 class="text-h6 mb-0">Cruises matching your search ({{ resultsCount }})</h2>
         </div>
 
         <v-row v-if="activeView === 'itinerary'">
-          <v-col v-for="group in groupedByItinerary" :key="group.itineraryName" cols="12">
+          <v-col v-for="group in sortedGroupedByItinerary" :key="group.itineraryName" cols="12">
             <ResultCard
               mode="itinerary"
               :cruise="group.leadDeparture"
@@ -508,6 +595,7 @@ const compareRows = computed(() => [
               :is-compared="compareIds.includes(group.leadDeparture.id)"
               :display-price="pricingValue(group.leadDeparture)"
               :price-label="pricingLabel"
+              :review-rating="itineraryRating(group)"
               :departure-prices="Object.fromEntries(group.departures.map((item) => [item.id, pricingValue(item)]))"
               @save="toggleSaved"
               @compare="toggleCompare"
@@ -517,7 +605,7 @@ const compareRows = computed(() => [
         </v-row>
 
         <v-row v-else>
-          <v-col v-for="cruise in filteredCruises" :key="cruise.id" cols="12" sm="6">
+          <v-col v-for="cruise in sortedFilteredCruises" :key="cruise.id" cols="12" sm="6">
             <ResultCard
               mode="date"
               :cruise="cruise"
@@ -526,6 +614,7 @@ const compareRows = computed(() => [
               :is-compared="compareIds.includes(cruise.id)"
               :display-price="pricingValue(cruise)"
               :price-label="pricingLabel"
+              :review-rating="cruiseRating(cruise)"
               @save="toggleSaved"
               @compare="toggleCompare"
               @quickview="openQuickView"
@@ -533,39 +622,54 @@ const compareRows = computed(() => [
           </v-col>
         </v-row>
 
-        <v-bottom-sheet v-model="comparePanelVisible" inset persistent>
-          <v-card rounded="xl" class="compare-panel surface-card">
-            <v-card-title class="d-flex align-center justify-space-between py-3">
-              <div class="d-flex align-center ga-2">
-                <v-icon icon="mdi-compare" color="secondary" />
-                <span>Compare panel ({{ compareCruises.length }}/4)</span>
-              </div>
-              <div class="d-flex align-center ga-2">
-                <v-btn size="small" variant="text" @click="closeComparePanel">Collapse</v-btn>
-                <v-btn size="small" color="primary" :disabled="compareCruises.length < 2" @click="openCompareModule">
-                  Compare
-                </v-btn>
-              </div>
-            </v-card-title>
-            <v-divider />
-            <v-card-text class="py-3">
-              <div class="d-flex flex-wrap ga-2">
-                <v-chip
-                  v-for="cruise in compareCruises"
-                  :key="cruise.id"
-                  color="secondary"
-                  variant="tonal"
-                  closable
-                  @click:close="toggleCompare(cruise.id)"
-                >
-                  {{ cruise.itineraryName }}
-                </v-chip>
-              </div>
-            </v-card-text>
-          </v-card>
-        </v-bottom-sheet>
       </v-col>
     </v-row>
+
+    <div v-if="compareIds.length > 0" class="compare-dock" :class="{ collapsed: comparePanelCollapsed }">
+      <v-card class="compare-panel surface-card" rounded="xl" elevation="6">
+        <v-card-title class="d-flex align-center justify-space-between py-3">
+          <div class="d-flex align-center ga-2">
+            <v-icon icon="mdi-compare" color="secondary" />
+            <span>Compare panel ({{ compareCruises.length }}/4)</span>
+          </div>
+          <div class="d-flex align-center ga-2">
+            <v-btn
+              size="small"
+              variant="text"
+              @click="comparePanelCollapsed ? expandComparePanel() : closeComparePanel()"
+            >
+              {{ comparePanelCollapsed ? 'Expand' : 'Collapse' }}
+            </v-btn>
+            <v-btn size="small" color="primary" :disabled="compareCruises.length < 2" @click="openCompareModule">
+              Compare
+            </v-btn>
+          </div>
+        </v-card-title>
+
+        <div v-show="!comparePanelCollapsed">
+          <v-divider />
+          <v-card-text class="py-3">
+            <div class="d-flex flex-wrap ga-2">
+              <v-chip
+                v-for="cruise in compareCruises"
+                :key="cruise.id"
+                color="secondary"
+                variant="tonal"
+                closable
+                @click:close="toggleCompare(cruise.id)"
+              >
+                {{ cruise.itineraryName }}
+              </v-chip>
+            </div>
+            <div class="mt-3">
+              <v-btn size="small" variant="text" color="secondary" @click="clearCompareSelections">
+                Clear all
+              </v-btn>
+            </div>
+          </v-card-text>
+        </div>
+      </v-card>
+    </div>
 
     <v-dialog v-model="mobileFiltersOpen" fullscreen>
       <v-card class="mobile-filter-shell">
@@ -768,10 +872,18 @@ const compareRows = computed(() => [
   background: #ffffff;
 }
 
-.dropdown-control {
+.control-group {
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+.sort-control {
+  margin-left: auto;
+}
+
+.sort-select {
+  min-width: 210px;
 }
 
 .control-label {
@@ -779,10 +891,6 @@ const compareRows = computed(() => [
   color: #2b557f;
   font-weight: 700;
   letter-spacing: 0.03em;
-}
-
-.control-select {
-  min-width: 170px;
 }
 
 .results-header {
@@ -859,19 +967,38 @@ const compareRows = computed(() => [
   border-top-right-radius: 18px;
 }
 
+.compare-dock {
+  position: fixed;
+  left: 16px;
+  right: 16px;
+  bottom: 12px;
+  z-index: 30;
+}
+
+.compare-dock.collapsed {
+  max-height: 78px;
+}
+
 @media (max-width: 600px) {
   .hero-title {
     font-size: 1.65rem !important;
     line-height: 1.2;
   }
 
-  .dropdown-control {
+  .control-group {
     width: 100%;
   }
 
-  .control-select {
-    min-width: 0;
-    flex: 1;
+  .sort-control {
+    margin-left: 0;
+  }
+
+  .control-group :deep(.v-btn-toggle) {
+    margin-left: auto;
+  }
+
+  .sort-control :deep(.v-field) {
+    width: 100%;
   }
 
   .results-header h2 {

@@ -12,6 +12,7 @@ const props = withDefaults(
     isCompared: boolean
     displayPrice: number
     priceLabel: string
+    reviewRating: number
     departurePrices?: Record<string, number>
   }>(),
   {
@@ -96,15 +97,15 @@ function openQuickView(): void {
           <v-icon :icon="isSaved ? 'mdi-heart' : 'mdi-heart-outline'" />
         </v-btn>
         <v-btn
-          icon
+          :prepend-icon="isCompared ? 'mdi-checkbox-marked' : 'mdi-checkbox-blank-outline'"
           size="small"
           variant="flat"
           :color="isCompared ? 'secondary' : 'white'"
-          class="icon-action mt-2"
+          class="compare-action"
           :aria-label="isCompared ? 'Remove from compare' : 'Add to compare'"
           @click.stop="emit('compare', cruise.id)"
         >
-          <v-icon :icon="isCompared ? 'mdi-checkbox-marked' : 'mdi-checkbox-blank-outline'" />
+          Compare
         </v-btn>
       </div>
     </v-img>
@@ -112,7 +113,18 @@ function openQuickView(): void {
     <v-card-text class="pa-4 pa-sm-5 pa-md-6 card-content">
       <div class="d-flex justify-space-between ga-3 align-start mb-3">
         <div>
-          <h2 class="text-subtitle-1 text-md-h6 font-weight-bold mb-1 card-title">{{ cruise.itineraryName }}</h2>
+          <div class="d-flex align-center flex-wrap ga-2 mb-1">
+            <h2 class="text-subtitle-1 text-md-h6 font-weight-bold mb-0 card-title">{{ cruise.itineraryName }}</h2>
+            <v-rating
+              :model-value="reviewRating"
+              color="amber"
+              size="16"
+              density="compact"
+              half-increments
+              readonly
+            />
+            <span class="text-caption text-medium-emphasis">{{ reviewRating.toFixed(1) }} / 5</span>
+          </div>
           <p class="text-caption route-copy mb-2">{{ cruise.itineraryMap }}</p>
           <p class="text-caption text-medium-emphasis mb-0 d-flex align-center ga-1">
             <v-icon size="14" icon="mdi-calendar-range" />
@@ -201,12 +213,18 @@ function openQuickView(): void {
   top: 12px;
   right: 12px;
   display: flex;
-  flex-direction: column;
-  align-items: flex-end;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
 }
 
 .icon-action {
   box-shadow: 0 4px 12px rgba(16, 58, 97, 0.15);
+}
+
+.compare-action {
+  box-shadow: 0 4px 12px rgba(16, 58, 97, 0.15);
+  font-size: 0.72rem;
 }
 
 .card-content {
