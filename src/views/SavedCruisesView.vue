@@ -23,6 +23,14 @@ function formatCurrency(value: number): string {
     maximumFractionDigits: 0,
   }).format(value)
 }
+
+function resolvedSavedImage(imageUrl: string): string {
+  if (imageUrl?.startsWith('/images/')) {
+    return imageUrl
+  }
+
+  return '/images/default.svg'
+}
 </script>
 
 <template>
@@ -56,7 +64,7 @@ function formatCurrency(value: number): string {
     <v-row v-else>
       <v-col v-for="item in savedCruises" :key="item.id" cols="12" md="6">
         <v-card rounded="xl" class="saved-card" elevation="2">
-          <v-img :src="item.imageUrl" height="180" cover />
+          <v-img :src="resolvedSavedImage(item.imageUrl)" height="180" cover />
           <v-card-text class="pa-4 pa-sm-5">
             <div class="d-flex justify-space-between ga-3 align-start mb-2">
               <div>
@@ -96,7 +104,7 @@ function formatCurrency(value: number): string {
             <v-btn variant="text" color="secondary" prepend-icon="mdi-delete-outline" @click="removeSavedCruise(item.id)">
               Remove
             </v-btn>
-            <v-btn color="primary" rounded="pill" href="#">Book now</v-btn>
+            <v-btn color="primary" variant="flat">Book now</v-btn>
           </v-card-actions>
         </v-card>
       </v-col>

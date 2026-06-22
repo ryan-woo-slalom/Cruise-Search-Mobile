@@ -97,6 +97,49 @@ const resultsCount = computed(() =>
   activeView.value === 'itinerary' ? sortedGroupedByItinerary.value.length : sortedFilteredCruises.value.length,
 )
 
+const viewModeLabel = computed(() => (activeView.value === 'itinerary' ? 'Itinerary' : 'Cruise Date'))
+const pricingModeLabel = computed(() => (pricingMode.value === 'person' ? 'Per Person' : 'Per Stateroom'))
+const sortModeLabel = computed(() => {
+  const selected = sortOptions.find((option) => option.value === sortMode.value)
+  return selected?.title ?? 'Recommended'
+})
+
+const appliedFiltersInline = computed(() => {
+  const parts: string[] = []
+  const query = searchQuery.value.trim()
+  const [selectedMinPrice = minPrice, selectedMaxPrice = maxPrice] = priceRange.value
+  const [selectedMinNights = minNights, selectedMaxNights = maxNights] = nightsRange.value
+
+  if (query.length > 0) {
+    parts.push(`Search: ${query}`)
+  }
+
+  if (selectedMonths.value.length > 0) {
+    const monthLabels = monthOptions.value
+      .filter((month) => selectedMonths.value.includes(month.value))
+      .map((month) => month.label)
+    parts.push(`Months: ${monthLabels.join(', ')}`)
+  }
+
+  if (selectedShips.value.length > 0) {
+    parts.push(`Ships: ${selectedShips.value.join(', ')}`)
+  }
+
+  if (selectedMinPrice !== minPrice || selectedMaxPrice !== maxPrice) {
+    parts.push(`Price: ${formatCurrency(selectedMinPrice)}-${formatCurrency(selectedMaxPrice)}`)
+  }
+
+  if (selectedMinNights !== minNights || selectedMaxNights !== maxNights) {
+    parts.push(`Nights: ${selectedMinNights}-${selectedMaxNights}`)
+  }
+
+  if (parts.length === 0) {
+    parts.push('No filters applied')
+  }
+
+  return parts.join(' | ')
+})
+
 const sortOptions: { title: string; value: SortMode }[] = [
   { title: 'Recommended', value: 'recommended' },
   { title: 'Highest Rated', value: 'highestRated' },
@@ -208,11 +251,11 @@ const sortedGroupedByItinerary = computed(() => {
     }
 
     if (sortMode.value === 'priceLowHigh') {
-      return pricingValue(a.leadDeparture) - pricingValue(b.leadDeparture)
+      return minPriceInItineraryGroup(a) - minPriceInItineraryGroup(b)
     }
 
     if (sortMode.value === 'priceHighLow') {
-      return pricingValue(b.leadDeparture) - pricingValue(a.leadDeparture)
+      return minPriceInItineraryGroup(b) - minPriceInItineraryGroup(a)
     }
 
     const aSaved = a.departures.some((departure) => savedIds.value.includes(departure.id))
@@ -226,7 +269,7 @@ const sortedGroupedByItinerary = computed(() => {
       return ratingDiff
     }
 
-    return pricingValue(a.leadDeparture) - pricingValue(b.leadDeparture)
+    return minPriceInItineraryGroup(a) - minPriceInItineraryGroup(b)
   })
 })
 
@@ -291,15 +334,19 @@ const guestCalculatorTotal = computed(() => {
     return 0
   }
 
-  const baseStateroom = quickViewStaterooms.value.reduce((sum, room) => {
-    return sum + quickViewSelectedCruise.value!.stateroomPricing[room.stateroomType]
-  }, 0)
-  const extraGuests = quickViewStaterooms.value.reduce((sum, room) => {
-    return sum + Math.max(room.adults + room.children - 2, 0)
-  }, 0)
-  const extraGuestRate = Math.round(quickViewSelectedCruise.value.pricePerPerson * 0.75)
+  return quickViewStaterooms.value.reduce((sum, room) => {
+    const cruise = quickViewSelectedCruise.value!
+    const roomGuests = room.adults + room.children
+    const extraAdults = Math.max(room.adults - 2, 0)
+    const extraChildren = room.children
+    const roomTotal =
+      cruise.totalBasePrice +
+      cruise.pricePerPerson * extraAdults * 0.85 +
+      cruise.pricePerPerson * extraChildren * 0.6 +
+      (roomGuests < 2 ? cruise.pricePerPerson * 0.5 : 0)
 
-  return baseStateroom + extraGuests * extraGuestRate
+    return sum + roomTotal
+  }, 0)
 })
 
 const guestCalculatorPerGuest = computed(() =>
@@ -332,6 +379,11 @@ function pricingValue(cruise: CruiseDeparture): number {
   }
 
   return Math.round(total / totalGuests.value)
+}
+
+function minPriceInItineraryGroup(group: ItineraryGroup): number {
+  const prices = group.departures.map((departure) => pricingValue(departure))
+  return Math.min(...prices)
 }
 
 function addStateroom(): void {
@@ -556,7 +608,33 @@ function saveQuickViewCruise(): void {
 }
 
 function destinationImage(destination: string): string {
-  return `https://picsum.photos/seed/${encodeURIComponent(destination)}/800/420`
+  const value = destination.toLowerCase()
+
+  if (value.includes('barcelona') || value.includes('marseille') || value.includes('mediterranean')) {
+    return '/images/mediterranean.svg'
+  }
+
+  if (value.includes('miami') || value.includes('nassau') || value.includes('cozumel') || value.includes('caribbean')) {
+    return '/images/caribbean.svg'
+  }
+
+  if (value.includes('juneau') || value.includes('skagway') || value.includes('ketchikan') || value.includes('alaska')) {
+    return '/images/alaska.svg'
+  }
+
+  if (value.includes('bergen') || value.includes('geiranger') || value.includes('oslo') || value.includes('nordic')) {
+    return '/images/nordic.svg'
+  }
+
+  if (value.includes('vancouver') || value.includes('san francisco') || value.includes('los angeles') || value.includes('pacific')) {
+    return '/images/pacific.svg'
+  }
+
+  if (value.includes('lisbon') || value.includes('azores') || value.includes('bermuda') || value.includes('new york') || value.includes('transatlantic')) {
+    return '/images/transatlantic.svg'
+  }
+
+  return '/images/default.svg'
 }
 
 function openCompareModule(): void {
@@ -613,7 +691,7 @@ const compareRows = computed(() => [
           Search itineraries, compare sail dates, and estimate room pricing in seconds.
         </p>
         <v-row class="align-center mt-1" dense>
-          <v-col cols="12" md="8">
+          <v-col cols="12" md="7">
             <v-text-field
               v-model="searchQuery"
               label="Search itineraries, ships, destinations"
@@ -624,8 +702,8 @@ const compareRows = computed(() => [
               bg-color="white"
             />
           </v-col>
-          <v-col cols="12" md="4">
-            <v-card variant="outlined" class="pa-3 pa-md-4 guest-panel h-100">
+          <v-col cols="12" md="5">
+            <v-card variant="outlined" class="pa-2 pa-md-3 guest-panel h-100">
               <div class="d-flex justify-space-between align-center mb-2">
                 <div class="text-subtitle-2">Staterooms</div>
                 <div class="d-flex ga-1">
@@ -702,7 +780,7 @@ const compareRows = computed(() => [
           <v-card-text class="py-3 px-3 px-sm-4 px-md-5 d-flex flex-wrap align-center ga-2 ga-sm-3">
           <v-btn
             v-if="!mdAndUp"
-            color="primary"
+            color="secondary"
             prepend-icon="mdi-filter-variant"
             rounded="pill"
             @click="mobileFiltersOpen = true"
@@ -756,7 +834,10 @@ const compareRows = computed(() => [
 
         <div class="results-header mb-3">
           <p class="text-overline mb-1 section-kicker">Search Results</p>
-          <h2 class="text-h6 mb-0">Cruises matching your search ({{ resultsCount }})</h2>
+          <h2 class="text-h6 mb-0">
+            Cruises matching your search ({{ resultsCount }})
+            <span class="results-filters-inline"> - {{ appliedFiltersInline }}</span>
+          </h2>
         </div>
 
         <v-row v-if="activeView === 'itinerary'">
@@ -768,7 +849,7 @@ const compareRows = computed(() => [
               :image-url="destinationImage(group.leadDeparture.itineraryMap.split('->')[1]?.trim() ?? group.leadDeparture.itineraryName)"
               :is-saved="savedIds.includes(group.leadDeparture.id)"
               :is-compared="compareIds.includes(group.leadDeparture.id)"
-              :display-price="pricingValue(group.leadDeparture)"
+              :display-price="minPriceInItineraryGroup(group)"
               :price-label="pricingLabel"
               :review-rating="itineraryRating(group)"
               :departure-prices="Object.fromEntries(group.departures.map((item) => [item.id, pricingValue(item)]))"
@@ -815,7 +896,7 @@ const compareRows = computed(() => [
             >
               {{ comparePanelCollapsed ? 'Expand' : 'Collapse' }}
             </v-btn>
-            <v-btn size="small" color="primary" :disabled="compareCruises.length < 2" @click="openCompareModule">
+            <v-btn size="small" color="primary" variant="flat" :disabled="compareCruises.length < 2" @click="openCompareModule">
               Compare
             </v-btn>
           </div>
@@ -958,21 +1039,11 @@ const compareRows = computed(() => [
                   </v-btn>
                 </div>
 
-                <v-btn
-                  color="secondary"
-                  variant="tonal"
-                  prepend-icon="mdi-heart"
-                  class="mb-3"
-                  block
-                  @click="saveQuickViewCruise"
-                >
-                  Save cruise
-                </v-btn>
-
                 <v-expansion-panels variant="accordion" class="mb-3">
                   <v-expansion-panel
                     v-for="(room, index) in quickViewStaterooms"
                     :key="`quick-room-${index}`"
+                    :title="`Stateroom ${index + 1}`"
                     rounded="lg"
                   >
                     <template #title>
@@ -1056,20 +1127,28 @@ const compareRows = computed(() => [
                   Max 4 guests per stateroom and at least 1 adult.
                 </p>
 
-                <v-divider class="my-4" />
+                <div class="quickview-pricing mt-4">
+                  <div class="text-body-2 text-medium-emphasis mb-1">Estimated total</div>
+                  <div class="text-h4 font-weight-bold mb-2">{{ formatCurrency(guestCalculatorTotal) }}</div>
+                  <div class="text-caption text-medium-emphasis">
+                    Price per stateroom: {{ formatCurrency(guestCalculatorPerStateroom) }}
+                  </div>
+                  <div class="text-caption text-medium-emphasis">
+                    Price per person: {{ formatCurrency(guestCalculatorPerGuest) }}
+                  </div>
+                </div>
 
-                <div class="d-flex justify-space-between text-body-2 mb-2 price-row">
-                  <span>Estimated total</span>
-                  <strong>{{ formatCurrency(guestCalculatorTotal) }}</strong>
-                </div>
-                <div class="d-flex justify-space-between text-body-2 mb-2 price-row">
-                  <span>Price per stateroom</span>
-                  <strong>{{ formatCurrency(guestCalculatorPerStateroom) }}</strong>
-                </div>
-                <div class="d-flex justify-space-between text-body-2 price-row">
-                  <span>Price per person</span>
-                  <strong>{{ formatCurrency(guestCalculatorPerGuest) }}</strong>
-                </div>
+                <v-btn
+                  :color="quickViewSelectionSaved ? 'secondary' : 'default'"
+                  :variant="quickViewSelectionSaved ? 'flat' : 'tonal'"
+                  :prepend-icon="quickViewSelectionSaved ? 'mdi-heart' : 'mdi-heart-outline'"
+                  :aria-label="quickViewSelectionSaved ? 'Remove cruise from saved' : 'Save cruise'"
+                  class="mt-4"
+                  block
+                  @click="quickViewSelectionSaved ? toggleQuickViewSaved() : saveQuickViewCruise()"
+                >
+                  {{ quickViewSelectionSaved ? 'Saved cruise' : 'Save cruise' }}
+                </v-btn>
               </v-sheet>
             </v-col>
           </v-row>
@@ -1077,7 +1156,7 @@ const compareRows = computed(() => [
         <v-divider />
         <v-card-actions class="justify-end px-4 pb-4 px-sm-5 pb-sm-5">
           <v-btn variant="text" @click="quickViewOpen = false">Close</v-btn>
-          <v-btn color="primary" href="#" rounded="pill">Book now</v-btn>
+          <v-btn color="primary" variant="flat">Book now</v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
@@ -1126,7 +1205,6 @@ const compareRows = computed(() => [
 }
 
 .hero-copy {
-  max-width: 58ch;
   color: #3e6287 !important;
   line-height: 1.5;
 }
@@ -1160,7 +1238,18 @@ const compareRows = computed(() => [
 
 .guest-panel {
   border-color: #cfdfee !important;
-  background: #f9fcff;
+  background: #ffffff;
+  box-shadow: none !important;
+}
+
+.guest-panel :deep(.v-expansion-panel-title) {
+  min-height: 42px;
+  padding-top: 8px;
+  padding-bottom: 8px;
+}
+
+.guest-panel :deep(.v-expansion-panel-text__wrapper) {
+  padding: 10px 12px 12px;
 }
 
 .section-kicker {
@@ -1201,6 +1290,12 @@ const compareRows = computed(() => [
   padding-top: 14px;
 }
 
+.results-filters-inline {
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: #4a6279;
+}
+
 .quickview-titlebar {
   background: linear-gradient(180deg, #f8fbff 0%, #f2f7fd 100%);
 }
@@ -1222,11 +1317,8 @@ const compareRows = computed(() => [
   overflow: hidden;
 }
 
-.price-row {
-  background: #f7fbff;
-  border: 1px solid #dde8f3;
-  border-radius: 10px;
-  padding: 10px 12px;
+.quickview-pricing {
+  text-align: right;
 }
 
 .route-copy {

@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 420" role="img" aria-labelledby="title desc">
+  <title id="title">Nordic Fjords</title>
+  <desc id="desc">Calm fjord scene with layered hills.</desc>
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#d6e5ff" />
+      <stop offset="100%" stop-color="#f4f8ff" />
+    </linearGradient>
+    <linearGradient id="fjord" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#4f7ea7" />
+      <stop offset="100%" stop-color="#2b5679" />
+    </linearGradient>
+  </defs>
+  <rect width="800" height="420" fill="url(#sky)" />
+  <path d="M0 210 C180 170, 310 230, 490 200 C625 178, 715 215, 800 195 L800 420 L0 420 Z" fill="#9fb8d1" />
+  <path d="M0 248 C140 220, 300 275, 500 245 C625 227, 705 262, 800 242 L800 420 L0 420 Z" fill="#7b9fc1" />
+  <path d="M0 286 C160 250, 290 315, 500 282 C642 258, 720 305, 800 288 L800 420 L0 420 Z" fill="url(#fjord)" />
+  <text x="40" y="66" font-family="Open Sans, sans-serif" font-size="38" fill="#274b6b" font-weight="700">Nordic Fjord Quest</text>
+</svg>

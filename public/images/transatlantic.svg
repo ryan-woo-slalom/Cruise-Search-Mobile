@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 420" role="img" aria-labelledby="title desc">
+  <title id="title">Transatlantic Crossing</title>
+  <desc id="desc">Open ocean route with starry horizon.</desc>
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#1b3352" />
+      <stop offset="100%" stop-color="#3e5f87" />
+    </linearGradient>
+    <linearGradient id="sea" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#2e4d75" />
+      <stop offset="100%" stop-color="#173451" />
+    </linearGradient>
+  </defs>
+  <rect width="800" height="420" fill="url(#sky)" />
+  <path d="M0 252 C190 222, 320 286, 500 250 C640 225, 720 272, 800 248 L800 420 L0 420 Z" fill="url(#sea)" />
+  <circle cx="170" cy="90" r="2" fill="#d8e9ff" />
+  <circle cx="210" cy="62" r="2" fill="#d8e9ff" />
+  <circle cx="260" cy="98" r="2" fill="#d8e9ff" />
+  <circle cx="620" cy="78" r="2" fill="#d8e9ff" />
+  <circle cx="560" cy="52" r="2" fill="#d8e9ff" />
+  <text x="40" y="66" font-family="Open Sans, sans-serif" font-size="34" fill="#e3efff" font-weight="700">Transatlantic Grand Crossing</text>
+</svg>

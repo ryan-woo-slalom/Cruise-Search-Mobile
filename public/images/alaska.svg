@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 420" role="img" aria-labelledby="title desc">
+  <title id="title">Alaska Glacier</title>
+  <desc id="desc">Snowy mountain and glacier-styled landscape.</desc>
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#c7ddff" />
+      <stop offset="100%" stop-color="#eef6ff" />
+    </linearGradient>
+    <linearGradient id="water" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#3e7fb8" />
+      <stop offset="100%" stop-color="#23527f" />
+    </linearGradient>
+  </defs>
+  <rect width="800" height="420" fill="url(#sky)" />
+  <path d="M60 260 L210 100 L330 240 Z" fill="#e4f0ff" />
+  <path d="M230 270 L390 80 L540 270 Z" fill="#d7e8fb" />
+  <path d="M470 280 L620 115 L760 280 Z" fill="#e8f2ff" />
+  <path d="M0 280 C140 300, 290 260, 500 290 C640 310, 710 276, 800 292 L800 420 L0 420 Z" fill="url(#water)" />
+  <text x="40" y="66" font-family="Open Sans, sans-serif" font-size="38" fill="#21486c" font-weight="700">Alaska Glacier Discovery</text>
+</svg>

@@ -19,6 +19,9 @@ Generate a fake dataset as a JSON file (src/data/metrics) with cruise data from 
 ### Header
 - Header on top
     - Desktop: "Intrepid" logo in top left, then "Cruises", "Destinations", and "Deals" in navbar with user profile menu in top right
+        - "Cruises" links to the Cruise Search page
+        - "Destinations" is not linked and is placeholder to a future destinations screen
+        - "Deals" is not linked and is placeholder to a future deals screen
     - Mobile: Hamburger menu in top left with "Intrepid" logo in centre, with user profile menu in top right. Navbar should be in the hamburger menu.
 
 ### Body - Search, Filter and Sort
@@ -26,12 +29,12 @@ Generate a fake dataset as a JSON file (src/data/metrics) with cruise data from 
 - Next to the Search input bar should be a Staterooms control where users can choose the number of staterooms for their cruise, and then also the number of guests per stateroom. Each stateroom should have an "Adults" and "Children" control. Maximum number of guests should be 4. With at least one Child, there must be at least one Adult. This "Guests" control changes the price per person calculation.
 - Filters on left rail (for desktop) and on a button (for mobile)
     - Expanded accordion view of all filtering options
-- "Pricing by" button group: Per Stateroom and Per Person
+- "Pricing by" dropdown menu: Per Stateroom and Per Person
     - Pricing by Stateroom
         - Refreshes the card to show the price by stateroom
     - Pricing per Person
         - Refreshes the card to show the price per person
-- "View by" button group: Itinerary and Cruise Date
+- "View by" dropdown menu: Itinerary and Cruise Date
     - Product cards by Itinerary
         - Number of Itinerary search results should reflect the number of itineraries only
         - Users should be able to dig into each Itinerary to see a quick view of the cruise along with cruise dates that fall under that Itinerary
@@ -55,6 +58,7 @@ Generate a fake dataset as a JSON file (src/data/metrics) with cruise data from 
     - Cruise cards should have a "Quick view" button to give an overview of the cruise
     - Cruise cards should have a "Book now" button that takes users into the booking flow
     - Cruise cards should have an image of the highlight destination in the itinerary
+        - Images should have fallback images incase the image service cannot be loaded
 - Quickview modal
     - Should contain the cruise itinerary
     - Should include information and highlights about the ship
@@ -62,11 +66,13 @@ Generate a fake dataset as a JSON file (src/data/metrics) with cruise data from 
     - Should include a cruise date selector
     - Should include a pricing calculator:
         - User should be able to add and remove staterooms, select a type of stateroom, and then configure the number of guests in that stateroom
-        - Receive a price per stateroom and per person for their number of staterooms and guests 
+        - Receive a price per stateroom and per person for their number of staterooms and guests
+        - Should have a secondary button "Save cruise" under the "Configure your cruise" section. Clicking this button should save this cruise itinerary, cruise date, and cruise configuration as a card to the Saved Cruises page.
     - Should have a Save (Heart) button that saves the user's cruise configuration to their Saved Cruises page
     - Should have a "Compare" button that allows the user to compare this cruise with other cruises
     - Should have a "Close" button that closes the modal
     - Should have a "Book now" button that takes user into the booking flow
+
 
 ### Body - Features
 - Compare
@@ -80,7 +86,12 @@ Generate a fake dataset as a JSON file (src/data/metrics) with cruise data from 
 
 ## Style
 - Google font: Open Sans
-- Use blues and whites as brand colours
+- Use blues, orange, and whites as brand colours
+- Background color: light grey with a hint of blue
+- All body text: dark grey
+- Book now button: Primary
+- Close button: Secondary
+- Quickview button: Secondary
 
 ## Tech
 - Vue 3 + TypeScript + Vuetify3

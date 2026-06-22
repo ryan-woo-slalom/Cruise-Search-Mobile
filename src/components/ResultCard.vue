@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref, watch } from 'vue'
 import type { CruiseDeparture } from '../types/cruise'
 
 const props = withDefaults(
@@ -59,6 +59,17 @@ const cardLabel = computed(() => {
   return `${props.cruise.nights} nights`
 })
 
+const defaultImage = '/images/default.svg'
+const safeImageUrl = ref(defaultImage)
+
+watch(
+  () => props.imageUrl,
+  (next) => {
+    safeImageUrl.value = next || defaultImage
+  },
+  { immediate: true },
+)
+
 function formatCurrency(value: number): string {
   return new Intl.NumberFormat('en-US', {
     style: 'currency',
@@ -74,15 +85,21 @@ function formatDate(date: string): string {
 function openQuickView(): void {
   emit('quickview', itineraryCruises.value, props.cruise.itineraryName)
 }
+
+function handleImageError(): void {
+  if (safeImageUrl.value !== defaultImage) {
+    safeImageUrl.value = defaultImage
+  }
+}
 </script>
 
 <template>
   <v-card rounded="xl" class="result-card surface-card fill-height" elevation="2">
-    <v-img :src="imageUrl" height="190" cover class="card-image">
+    <v-img :src="safeImageUrl" height="190" cover eager class="card-image" @error="handleImageError">
       <div class="image-overlay" />
       <div class="image-chip-wrap">
-        <v-chip color="white" size="small" variant="flat">{{ cruise.shipName }}</v-chip>
-        <v-chip color="primary" size="small" variant="flat" class="ml-2">{{ cardLabel }}</v-chip>
+        <v-chip color="primary" size="small" variant="flat">{{ cruise.shipName }}</v-chip>
+        <v-chip color="secondary" size="small" variant="outlined" class="ml-2 card-label-chip">{{ cardLabel }}</v-chip>
       </div>
       <div class="image-actions">
         <v-btn
@@ -127,7 +144,7 @@ function openQuickView(): void {
           </div>
         </div>
         <div class="text-right price-wrap">
-          <v-chip color="primary" variant="flat" size="small">{{ formatCurrency(displayPrice) }}</v-chip>
+          <div class="price-display">{{ formatCurrency(displayPrice) }}</div>
           <div class="text-caption mt-1">Starting from per {{ priceLabel }}</div>
         </div>
       </div>
@@ -142,7 +159,7 @@ function openQuickView(): void {
           <v-expansion-panel :title="`Show ${itineraryCruises.length} cruise dates`" rounded="lg">
             <v-expansion-panel-text>
               <v-row>
-                <v-col v-for="departure in itineraryCruises" :key="departure.id" cols="12" sm="6">
+                <v-col v-for="departure in itineraryCruises" :key="departure.id" cols="12">
                   <v-sheet rounded="lg" class="pa-3 departure-chip">
                     <div class="text-subtitle-2 mb-1">
                       {{ formatDate(departure.startDate) }} to {{ formatDate(departure.endDate) }}
@@ -176,7 +193,7 @@ function openQuickView(): void {
     <v-card-actions class="px-4 pb-5 pt-3 px-sm-5 pb-sm-5 px-md-6 pb-md-6 card-actions">
       <v-spacer />
       <v-btn size="small" variant="outlined" @click="openQuickView">Quick view</v-btn>
-      <v-btn size="small" color="primary" href="#" rounded="pill">Book now</v-btn>
+      <v-btn size="small" color="primary" variant="flat">Book now</v-btn>
     </v-card-actions>
   </v-card>
 </template>
@@ -206,6 +223,10 @@ function openQuickView(): void {
   position: absolute;
   left: 12px;
   bottom: 12px;
+}
+
+.card-label-chip {
+  background-color: #ffffff !important;
 }
 
 .image-actions {
@@ -253,6 +274,13 @@ function openQuickView(): void {
 
 .price-wrap {
   min-width: fit-content;
+}
+
+.price-display {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #13395f;
+  line-height: 1.2;
 }
 
 .card-title {
