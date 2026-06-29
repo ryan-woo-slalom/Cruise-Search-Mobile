@@ -25,7 +25,11 @@ function formatCurrency(value: number): string {
 }
 
 function resolvedSavedImage(imageUrl: string): string {
-  if (imageUrl?.startsWith('/images/')) {
+  if (imageUrl?.includes('source.unsplash.com')) {
+    return '/images/default.svg'
+  }
+
+  if (imageUrl?.startsWith('/images/') || imageUrl?.startsWith('http://') || imageUrl?.startsWith('https://')) {
     return imageUrl
   }
 

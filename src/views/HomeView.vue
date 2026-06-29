@@ -627,31 +627,41 @@ function saveQuickViewCruise(): void {
 function destinationImage(destination: string): string {
   const value = destination.toLowerCase()
 
+  const openSourcePhotos = {
+    mediterranean: 'https://images.pexels.com/photos/3278215/pexels-photo-3278215.jpeg?auto=compress&cs=tinysrgb&w=1600',
+    caribbean: 'https://images.pexels.com/photos/1007836/pexels-photo-1007836.jpeg?auto=compress&cs=tinysrgb&w=1600',
+    alaska: 'https://images.pexels.com/photos/813011/pexels-photo-813011.jpeg?auto=compress&cs=tinysrgb&w=1600',
+    nordic: 'https://images.pexels.com/photos/1268855/pexels-photo-1268855.jpeg?auto=compress&cs=tinysrgb&w=1600',
+    pacific: 'https://images.pexels.com/photos/346529/pexels-photo-346529.jpeg?auto=compress&cs=tinysrgb&w=1600',
+    transatlantic: 'https://images.pexels.com/photos/1371360/pexels-photo-1371360.jpeg?auto=compress&cs=tinysrgb&w=1600',
+    default: 'https://images.pexels.com/photos/3278216/pexels-photo-3278216.jpeg?auto=compress&cs=tinysrgb&w=1600',
+  }
+
   if (value.includes('barcelona') || value.includes('marseille') || value.includes('mediterranean')) {
-    return '/images/mediterranean.svg'
+    return openSourcePhotos.mediterranean
   }
 
   if (value.includes('miami') || value.includes('nassau') || value.includes('cozumel') || value.includes('caribbean')) {
-    return '/images/caribbean.svg'
+    return openSourcePhotos.caribbean
   }
 
   if (value.includes('juneau') || value.includes('skagway') || value.includes('ketchikan') || value.includes('alaska')) {
-    return '/images/alaska.svg'
+    return openSourcePhotos.alaska
   }
 
   if (value.includes('bergen') || value.includes('geiranger') || value.includes('oslo') || value.includes('nordic')) {
-    return '/images/nordic.svg'
+    return openSourcePhotos.nordic
   }
 
   if (value.includes('vancouver') || value.includes('san francisco') || value.includes('los angeles') || value.includes('pacific')) {
-    return '/images/pacific.svg'
+    return openSourcePhotos.pacific
   }
 
   if (value.includes('lisbon') || value.includes('azores') || value.includes('bermuda') || value.includes('new york') || value.includes('transatlantic')) {
-    return '/images/transatlantic.svg'
+    return openSourcePhotos.transatlantic
   }
 
-  return '/images/default.svg'
+  return openSourcePhotos.default
 }
 
 function openCompareModule(): void {

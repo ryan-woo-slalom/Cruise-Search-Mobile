@@ -21,7 +21,7 @@ const isDesktop = computed(() => mdAndUp.value)
       <div class="pa-5 drawer-brand border-b">
         <div class="d-flex align-center ga-2">
           <img src="/logo.svg?v=2" alt="" class="logo-icon" />
-          <p class="text-overline mb-0">Intrepid</p>
+          <p class="drawer-brand-title mb-0">Intrepid</p>
         </div>
       </div>
       <v-list nav density="comfortable" class="pa-2">
@@ -185,6 +185,14 @@ const isDesktop = computed(() => mdAndUp.value)
 
 .drawer-brand {
   color: #164675;
+}
+
+.drawer-brand-title {
+  font-weight: 800;
+  color: #0b4f8a;
+  letter-spacing: 0.16em;
+  font-size: 1rem;
+  text-transform: uppercase;
 }
 
 .border-b {
