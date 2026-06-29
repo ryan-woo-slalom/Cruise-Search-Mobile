@@ -311,6 +311,13 @@ function continueToBooking(): void {
     query: {
       cruiseId: selectedCruiseId.value,
       stateroomTypes: JSON.stringify(editableStaterooms.value.map((sr) => sr.stateroomType)),
+      stateroomDetails: JSON.stringify(
+        editableStaterooms.value.map((sr) => ({
+          stateroomType: sr.stateroomType,
+          adults: sr.adults,
+          children: sr.children,
+        })),
+      ),
       adults: editableStaterooms.value.reduce((sum, sr) => sum + sr.adults, 0),
       children: editableStaterooms.value.reduce((sum, sr) => sum + sr.children, 0),
       totalPrice: calculatedPricing.value.totalPrice,

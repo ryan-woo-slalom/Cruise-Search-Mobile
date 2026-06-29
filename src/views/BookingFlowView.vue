@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import type { CruiseDeparture, StateroomPricing } from '../types/cruise'
 import cruiseData from '../data/metrics.json'
@@ -7,8 +7,12 @@ import cruiseData from '../data/metrics.json'
 const router = useRouter()
 const route = useRoute()
 
+type StateroomType = keyof StateroomPricing
+
 const cruiseId = route.query.cruiseId as string
-const stateroomTypes = route.query.stateroomTypes ? (JSON.parse(route.query.stateroomTypes as string) as (keyof StateroomPricing)[]) : ['interior']
+const stateroomTypes = route.query.stateroomTypes
+  ? (JSON.parse(route.query.stateroomTypes as string) as StateroomType[])
+  : (['interior'] as StateroomType[])
 const adults = parseInt(route.query.adults as string) || 0
 const children = parseInt(route.query.children as string) || 0
 const totalPrice = parseInt(route.query.totalPrice as string) || 0
@@ -17,22 +21,153 @@ const pricePerPerson = parseInt(route.query.pricePerPerson as string) || 0
 
 const cruise = (cruiseData as CruiseDeparture[]).find((c) => c.id === cruiseId)
 
+interface BookingStateroom {
+  stateroomType: StateroomType
+  adults: number
+  children: number
+}
+
+interface CabinOption {
+  id: string
+  label: string
+  price: number
+}
+
+const stateroomTypeLabels: Record<StateroomType, string> = {
+  interior: 'Interior',
+  oceanview: 'Oceanview',
+  balcony: 'Balcony',
+  suite: 'Suite',
+}
+
+const cabinVariantsByType: Record<StateroomType, Array<{ key: string; label: string; price: number }>> = {
+  interior: [
+    { key: 'standard', label: 'Standard', price: 0 },
+    { key: 'premium', label: 'Premium', price: 150 },
+    { key: 'spacious', label: 'Spacious', price: 300 },
+  ],
+  oceanview: [
+    { key: 'standard', label: 'Standard', price: 0 },
+    { key: 'premium', label: 'Premium with Balcony', price: 300 },
+  ],
+  balcony: [
+    { key: 'standard', label: 'Standard', price: 0 },
+    { key: 'deluxe', label: 'Deluxe', price: 300 },
+    { key: 'grand', label: 'Grand', price: 600 },
+  ],
+  suite: [
+    { key: 'grand', label: 'Grand', price: 0 },
+    { key: 'penthouse', label: 'Penthouse', price: 500 },
+  ],
+}
+
+function parseStateroomDetails(
+  detailsValue: unknown,
+  fallbackTypes: StateroomType[],
+  totalAdults: number,
+  totalChildren: number,
+): BookingStateroom[] {
+  const allowedTypes: StateroomType[] = ['interior', 'oceanview', 'balcony', 'suite']
+
+  if (typeof detailsValue === 'string') {
+    try {
+      const parsed = JSON.parse(detailsValue) as Array<{ stateroomType?: string; adults?: number; children?: number }>
+      const sanitized = parsed
+        .map((room) => {
+          if (!room || !room.stateroomType || !allowedTypes.includes(room.stateroomType as StateroomType)) {
+            return null
+          }
+
+          return {
+            stateroomType: room.stateroomType as StateroomType,
+            adults: Math.max(Number(room.adults) || 0, 0),
+            children: Math.max(Number(room.children) || 0, 0),
+          }
+        })
+        .filter((room): room is BookingStateroom => room !== null)
+
+      if (sanitized.length > 0) {
+        return sanitized
+      }
+    } catch {
+      // Fallback to stateroomTypes query parsing below
+    }
+  }
+
+  const sanitizedTypes = fallbackTypes.filter((type): type is StateroomType => allowedTypes.includes(type))
+  const roomTypes: StateroomType[] = sanitizedTypes.length > 0 ? sanitizedTypes : ['interior']
+  const roomCount = roomTypes.length
+  const initialRooms: BookingStateroom[] = roomTypes.map((type) => ({ stateroomType: type, adults: 1, children: 0 }))
+
+  let remainingAdults = Math.max(totalAdults - roomCount, 0)
+  let remainingChildren = Math.max(totalChildren, 0)
+
+  while (remainingAdults > 0 || remainingChildren > 0) {
+    let changed = false
+
+    for (const room of initialRooms) {
+      const roomGuests = room.adults + room.children
+
+      if (roomGuests < 4 && remainingAdults > 0) {
+        room.adults += 1
+        remainingAdults -= 1
+        changed = true
+      }
+
+      if (room.adults + room.children < 4 && remainingChildren > 0) {
+        room.children += 1
+        remainingChildren -= 1
+        changed = true
+      }
+
+      if (remainingAdults <= 0 && remainingChildren <= 0) {
+        break
+      }
+    }
+
+    if (!changed) {
+      break
+    }
+  }
+
+  return initialRooms
+}
+
+const bookingStaterooms = parseStateroomDetails(route.query.stateroomDetails, stateroomTypes, adults, children)
+
+function getCabinOptionsForType(stateroomType: StateroomType): CabinOption[] {
+  return cabinVariantsByType[stateroomType].map((variant) => ({
+    id: `${stateroomType}-${variant.key}`,
+    label: `${stateroomTypeLabels[stateroomType]} - ${variant.label}`,
+    price: variant.price,
+  }))
+}
+
 const currentStep = ref(1)
-const selectedCabinType = ref<string>('')
+const selectedCabinTypes = ref<string[]>(
+  bookingStaterooms.map((room) => getCabinOptionsForType(room.stateroomType)[0]?.id ?? ''),
+)
 const selectedAddOns = ref<string[]>([])
 
-const cabinTypeOptions = [
-  { id: 'interior-standard', label: 'Interior - Standard', type: 'Interior', price: 0 },
-  { id: 'interior-premium', label: 'Interior - Premium', type: 'Interior', price: 150 },
-  { id: 'interior-spacious', label: 'Interior - Spacious', type: 'Interior', price: 300 },
-  { id: 'oceanview-standard', label: 'Oceanview - Standard', type: 'Oceanview', price: 300 },
-  { id: 'oceanview-premium', label: 'Oceanview - Premium with Balcony', type: 'Oceanview', price: 600 },
-  { id: 'balcony-standard', label: 'Balcony - Standard', type: 'Balcony', price: 600 },
-  { id: 'balcony-deluxe', label: 'Balcony - Deluxe', type: 'Balcony', price: 900 },
-  { id: 'balcony-grand', label: 'Balcony - Grand', type: 'Balcony', price: 1200 },
-  { id: 'suite-grand', label: 'Suite - Grand', type: 'Suite', price: 1500 },
-  { id: 'suite-penthouse', label: 'Suite - Penthouse', type: 'Suite', price: 2000 },
-]
+const cabinStepCount = bookingStaterooms.length
+const addOnsStepValue = cabinStepCount + 1
+const reviewStepValue = cabinStepCount + 2
+const totalStepCount = reviewStepValue
+
+const bookingSteps = computed(() => [
+  ...bookingStaterooms.map((room, index) => `${stateroomTypeLabels[room.stateroomType]} Cabin ${index + 1}`),
+  'Add-ons',
+  'Review & Confirm',
+])
+const mobileStepProgress = computed(() => (currentStep.value / totalStepCount) * 100)
+const currentStepLabel = computed(() => bookingSteps.value[currentStep.value - 1] ?? '')
+const cabinUpgradeCost = computed(() =>
+  bookingStaterooms.reduce((sum, room, index) => {
+    const selectedId = selectedCabinTypes.value[index]
+    const selectedOption = getCabinOptionsForType(room.stateroomType).find((opt) => opt.id === selectedId)
+    return sum + (selectedOption?.price ?? 0)
+  }, 0),
+)
 
 const addOnOptions = [
   { id: 'beverage', label: 'Beverage Package', price: 200 },
@@ -50,7 +185,7 @@ function formatCurrency(value: number): string {
 }
 
 function nextStep(): void {
-  if (currentStep.value < 3) {
+  if (currentStep.value < totalStepCount) {
     currentStep.value++
   }
 }
@@ -61,8 +196,28 @@ function previousStep(): void {
   }
 }
 
+function goBackToBookingLanding(): void {
+  router.push({
+    name: 'booking-landing',
+    query: {
+      cruiseId,
+      stateroomTypes: route.query.stateroomTypes,
+      stateroomDetails: route.query.stateroomDetails,
+      adults: route.query.adults,
+      children: route.query.children,
+      totalPrice: route.query.totalPrice,
+      pricePerStateroom: route.query.pricePerStateroom,
+      pricePerPerson: route.query.pricePerPerson,
+    },
+  })
+}
+
 function completeBooking(): void {
   // Booking complete - could redirect to confirmation page or back to home
+  router.push('/')
+}
+
+function goBack(): void {
   router.push('/')
 }
 
@@ -78,19 +233,20 @@ function updateAddOnCost(): void {
     return sum + (addOn?.price || 0)
   }, 0)
 }
+
+function selectedCabinLabel(room: BookingStateroom, index: number): string {
+  const selectedId = selectedCabinTypes.value[index]
+  const selectedOption = getCabinOptionsForType(room.stateroomType).find((opt) => opt.id === selectedId)
+  return selectedOption?.label ?? 'Not selected'
+}
 </script>
 
 <template>
   <v-container fluid class="booking-flow-page pa-3 pa-sm-5 pa-md-8">
-    <div class="booking-flow-header mb-6">
-      <div class="d-flex align-center justify-space-between flex-wrap ga-3">
-        <div>
-          <div class="text-overline text-white mb-1">Intrepid Cruise Lines</div>
-          <h1 class="text-h4 font-weight-bold text-white">Booking Flow</h1>
-          <p class="text-body-2 text-white mb-0">Personalize your cabin and complete your cruise booking.</p>
-        </div>
-        <v-btn color="white" variant="tonal" prepend-icon="mdi-arrow-left" @click="cancelBooking">Back to Search</v-btn>
-      </div>
+    <div class="booking-landing-header mb-6">
+      <v-btn color="secondary" variant="outlined" prepend-icon="mdi-arrow-left" @click="goBack">
+        Back to Search
+      </v-btn>
     </div>
 
     <v-card rounded="xl" elevation="4" class="booking-flow-card">
@@ -101,22 +257,52 @@ function updateAddOnCost(): void {
           <v-chip color="secondary" size="small" variant="flat">Secure Booking</v-chip>
         </div>
 
+        <div class="step-progress-mobile mb-5">
+          <div class="d-flex align-center justify-space-between mb-2">
+            <span class="text-caption text-medium-emphasis">Step {{ currentStep }} of {{ totalStepCount }}</span>
+            <span class="text-caption font-weight-medium">{{ currentStepLabel }}</span>
+          </div>
+          <v-progress-linear
+            :model-value="mobileStepProgress"
+            color="secondary"
+            height="8"
+            rounded
+          />
+        </div>
+
         <v-stepper v-model="currentStep" class="mb-6">
-          <v-stepper-header>
-            <v-stepper-item :complete="currentStep > 1" :value="1" title="Cabin Type" />
+          <v-stepper-header class="stepper-header-desktop">
+            <template v-for="(_, index) in bookingStaterooms" :key="`cabin-step-${index}`">
+              <v-stepper-item
+                :complete="currentStep > index + 1"
+                :value="index + 1"
+                :title="`Cabin ${index + 1}`"
+              />
+              <v-divider />
+            </template>
+            <v-stepper-item :complete="currentStep > addOnsStepValue" :value="addOnsStepValue" title="Add-ons" />
             <v-divider />
-            <v-stepper-item :complete="currentStep > 2" :value="2" title="Add-ons" />
-            <v-divider />
-            <v-stepper-item :value="3" title="Review & Confirm" />
+            <v-stepper-item :value="reviewStepValue" title="Review & Confirm" />
           </v-stepper-header>
 
           <v-stepper-window>
-            <!-- Step 1: Cabin Type -->
-            <v-stepper-window-item :value="1">
+            <!-- Cabin Selection Steps -->
+            <v-stepper-window-item
+              v-for="(stateroom, index) in bookingStaterooms"
+              :key="`cabin-step-content-${index}`"
+              :value="index + 1"
+            >
               <div class="pa-4">
-                <h3 class="text-subtitle-1 font-weight-bold mb-4">Select Cabin Type</h3>
-                <v-radio-group v-model="selectedCabinType">
-                  <div v-for="option in cabinTypeOptions" :key="option.id" class="mb-3">
+                <h3 class="text-subtitle-1 font-weight-bold mb-2">Select Cabin Type</h3>
+                <div class="mb-4">
+                  <div class="text-body-2 text-medium-emphasis">Stateroom {{ index + 1 }} of {{ cabinStepCount }}</div>
+                  <div class="text-body-1 font-weight-medium">{{ stateroomTypeLabels[stateroom.stateroomType] }} Stateroom</div>
+                  <div class="text-body-2 text-medium-emphasis">
+                    {{ stateroom.adults }} Adults, {{ stateroom.children }} Children
+                  </div>
+                </div>
+                <v-radio-group v-model="selectedCabinTypes[index]">
+                  <div v-for="option in getCabinOptionsForType(stateroom.stateroomType)" :key="option.id" class="mb-3">
                     <v-radio :value="option.id">
                       <template #label>
                         <div class="d-flex justify-space-between w-100 ga-4">
@@ -130,8 +316,8 @@ function updateAddOnCost(): void {
               </div>
             </v-stepper-window-item>
 
-            <!-- Step 2: Add-ons -->
-            <v-stepper-window-item :value="2">
+            <!-- Add-ons Step -->
+            <v-stepper-window-item :value="addOnsStepValue">
               <div class="pa-4">
                 <h3 class="text-subtitle-1 font-weight-bold mb-4">Select Add-ons</h3>
                 <div class="mb-4">
@@ -159,8 +345,8 @@ function updateAddOnCost(): void {
               </div>
             </v-stepper-window-item>
 
-            <!-- Step 3: Review & Confirm -->
-            <v-stepper-window-item :value="3">
+            <!-- Review & Confirm Step -->
+            <v-stepper-window-item :value="reviewStepValue">
               <div class="pa-4">
                 <h3 class="text-subtitle-1 font-weight-bold mb-4">Review Your Booking</h3>
                 <v-row class="mb-6">
@@ -174,9 +360,13 @@ function updateAddOnCost(): void {
                       <div class="text-body-1 font-weight-medium">{{ adults }} Adults, {{ children }} Children</div>
                     </div>
                     <div class="mb-3">
-                      <div class="text-body-2 text-medium-emphasis">Cabin Type</div>
-                      <div class="text-body-1 font-weight-medium">
-                        {{ cabinTypeOptions.find((o) => o.id === selectedCabinType)?.label || 'Not selected' }}
+                      <div class="text-body-2 text-medium-emphasis">Selected Cabin Types</div>
+                      <div
+                        v-for="(stateroom, index) in bookingStaterooms"
+                        :key="`review-cabin-${index}`"
+                        class="text-body-1 font-weight-medium"
+                      >
+                        Stateroom {{ index + 1 }}: {{ selectedCabinLabel(stateroom, index) }}
                       </div>
                     </div>
                   </v-col>
@@ -187,13 +377,19 @@ function updateAddOnCost(): void {
                         <div class="text-h6 font-weight-bold">{{ formatCurrency(totalPrice) }}</div>
                       </div>
                       <div class="mb-4">
+                        <div class="text-body-2 text-medium-emphasis mb-1">Cabin Upgrades</div>
+                        <div class="text-h6 font-weight-bold">{{ formatCurrency(cabinUpgradeCost) }}</div>
+                      </div>
+                      <div class="mb-4">
                         <div class="text-body-2 text-medium-emphasis mb-1">Add-ons</div>
                         <div class="text-h6 font-weight-bold">{{ formatCurrency(addOnCost) }}</div>
                       </div>
                       <v-divider class="my-3" />
                       <div>
                         <div class="text-body-2 text-medium-emphasis mb-1">Grand Total</div>
-                        <div class="text-h5 font-weight-bold total-highlight">{{ formatCurrency(totalPrice + addOnCost) }}</div>
+                        <div class="text-h5 font-weight-bold total-highlight">
+                          {{ formatCurrency(totalPrice + cabinUpgradeCost + addOnCost) }}
+                        </div>
                       </div>
                     </v-card>
                   </v-col>
@@ -207,17 +403,16 @@ function updateAddOnCost(): void {
 
         <div class="d-flex align-center justify-space-between">
           <v-btn
-            :disabled="currentStep === 1"
             variant="text"
             color="secondary"
-            @click="previousStep"
+            @click="goBackToBookingLanding"
           >
             Back
           </v-btn>
           <div class="d-flex ga-3">
             <v-btn variant="text" color="secondary" @click="cancelBooking">Cancel</v-btn>
             <v-btn
-              v-if="currentStep < 3"
+              v-if="currentStep < totalStepCount"
               color="primary"
               variant="flat"
               @click="nextStep"
@@ -260,8 +455,22 @@ function updateAddOnCost(): void {
   background: rgba(255, 255, 255, 0.97);
 }
 
+.step-progress-mobile {
+  display: none;
+}
+
 .total-highlight {
   color: #e67e22;
+}
+
+@media (max-width: 959px) {
+  .step-progress-mobile {
+    display: block;
+  }
+
+  .stepper-header-desktop {
+    display: none;
+  }
 }
 
 @media (min-width: 960px) {

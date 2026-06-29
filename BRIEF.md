@@ -125,7 +125,9 @@ Comprehensive fake dataset as a JSON file (src/data/metrics.json) with 77 cruise
 ### Booking Flow
 - Booking Flow
     - Continuing from the Booking Landing page, users should be taken to a multi-step process where they select various aspects of their cruise
-        - Cabin type: various incarnations of the selected staterooms (example: Interior with View, Balcony with Chairs, Luxury Stateroom)
+    - Cabin type: each selected stateroom gets its own cabin-selection step
+    - Cabin options are filtered by stateroom type (for example, Interior only shows Interior variants)
+    - Each cabin step shows selected stateroom details (type, adults, children)
         - Cruise add-ons
    
 ### Footer
@@ -171,7 +173,7 @@ The application has been set up with Vue Router (v4) with the following routes:
 - **Features**:
   - Back button at the top and at the bottom to return to Cruise Search
   - Title heading of the cruise name with a big splash image of the cruise (same one used for the cruise card)
-  - Query parameter handling: cruiseId, stateroomTypes, adults, children, totalPrice, pricePerStateroom, pricePerPerson
+  - Query parameter handling: cruiseId, stateroomTypes, stateroomDetails, adults, children, totalPrice, pricePerStateroom, pricePerPerson
   - Displays cruise details (name, date range, duration, ship)
   - **Sail Date Selection**:
     - Dropdown of available departures for the selected itinerary
@@ -193,28 +195,39 @@ The application has been set up with Vue Router (v4) with the following routes:
     - Price per person (total price ÷ total guests)
   - Pricing card with breakdown displayed on right side (sticky positioning)
   - Save Cruise button stores the currently selected departure and stateroom configuration in Saved Cruises
-  - Navigation: Back button (left-aligned, returns to home), Save Cruise and Continue buttons on right (Continue proceeds to booking flow with updated values)
+  - Navigation: Back button (left-aligned, returns to home), Save Cruise and Continue buttons on right (Continue proceeds to booking flow with updated values and full stateroom details)
   - Stateroom type label formatter for display (interior → "Interior", etc.)
 
 #### BookingFlowView.vue
 - **Purpose**: Multi-step booking process for cruise bookings
 - **Location**: src/views/BookingFlowView.vue
 - **Features**:
-  - Vuetify Stepper component with 3 steps:
-    - **Step 1: Cabin Type** - Selection of cabin type variants across 4 categories:
-      - Interior: Standard, Premium, Spacious
-      - Oceanview: Standard, Premium with Balcony
-      - Balcony: Standard, Deluxe, Grand
-      - Suite: Grand, Penthouse
-      - Single selection per variant (radio group or select interface)
-      - Optional pricing display per variant where available
-    - **Step 2: Add-ons** - Checkboxes for optional services (Beverage Package, Speciality Dining, Internet, Shore Excursions)
-    - **Step 3: Review & Confirm** - Summary display with final pricing including add-ons
-  - Dynamic pricing: Add-on selections recalculate total cost in real-time
-  - Query parameter parsing to restore user's cruise and pricing selection
-  - Navigation: Previous/Next buttons to navigate between steps, Cancel button to exit
+  - Dynamic stepper with one cabin-selection step per selected stateroom, followed by Add-ons and Review & Confirm
+  - Cabin selections are constrained by selected stateroom type:
+    - Interior: Standard, Premium, Spacious
+    - Oceanview: Standard, Premium with Balcony
+    - Balcony: Standard, Deluxe, Grand
+    - Suite: Grand, Penthouse
+  - Each cabin-selection step shows stateroom context details:
+    - Stateroom index (for example, Stateroom 2 of 3)
+    - Stateroom type label
+    - Adults and children counts
+  - Responsive step progress indicator:
+    - Desktop uses stepper header
+    - Mobile uses compact "Step X of Y" text + progress bar
+  - Dynamic pricing:
+    - Add-on selections recalculate add-on total in real-time
+    - Cabin upgrade selections calculate cabin upgrade total
+    - Review step grand total includes base cruise + cabin upgrades + add-ons
+  - Query parameter parsing to restore user's cruise, stateroom selections, and pricing selection
+  - Navigation: Back button returns to Booking Landing with original query context, Cancel exits flow
   - Complete Booking button on final step (returns to home upon completion)
   - Currency formatting with locale-aware number formatting
+
+### Router Behavior Updates
+- Global scroll reset on navigation via Vue Router `scrollBehavior`
+  - New route navigations (including Book now → Booking Landing and Continue → Booking Flow) start at top of page
+  - Browser saved positions are preserved for history navigation where applicable
 
 ### ResultCard Component Updates
 - Added `book` event emit to result card component
