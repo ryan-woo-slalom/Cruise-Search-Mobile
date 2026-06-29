@@ -928,9 +928,11 @@ const compareRows = computed(() => [
     <v-row class="align-start">
       <v-col cols="12" md="3">
         <v-card v-if="mdAndUp" rounded="xl" class="sticky-filters filters-shell surface-card" elevation="2">
-          <v-card-title class="d-flex align-center ga-2 py-4">
-            <v-icon icon="mdi-tune-variant" color="primary" />
-            Filters
+          <v-card-title class="py-4">
+            <div class="d-flex align-center ga-2">
+              <v-icon icon="mdi-tune-variant" color="primary" />
+              Filters
+            </div>
           </v-card-title>
           <v-divider />
           <v-card-text class="pa-0">
@@ -1028,6 +1030,15 @@ const compareRows = computed(() => [
             >
               {{ filter.label }}
             </v-chip>
+            <v-btn
+              size="x-small"
+              variant="text"
+              color="secondary"
+              class="px-1"
+              @click="clearAllFilters"
+            >
+              Clear filters
+            </v-btn>
           </div>
           <div v-else class="text-body-2 text-medium-emphasis mb-2">No filters applied</div>
         </div>

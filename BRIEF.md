@@ -44,7 +44,10 @@ Comprehensive fake dataset as a JSON file (src/data/metrics.json) with 77 cruise
     - Guest summary displayed below accordions: "X staterooms • Y Adults, Z Children"
     - This control's configuration syncs to the Quickview modal stateroom defaults (but changes in Quick View don't affect the Search page) 
 - Filters on left rail (for desktop) and on a button (for mobile)
-    - Expanded accordion view of all filtering options
+    - Chip-based filter UI with individual removable selections
+    - Month and Ship selections render as blue closable chips inside the select input fields
+    - Price and Cruise Nights show as single adjustable chips when range is modified from defaults
+    - Each chip can be removed individually to update filters immediately
 - "Pricing by" dropdown menu: Per Stateroom and Per Person
     - Pricing by Stateroom
         - Refreshes the card to show the price by stateroom
@@ -67,6 +70,8 @@ Comprehensive fake dataset as a JSON file (src/data/metrics.json) with 77 cruise
   - Display a summary line showing all active filters and searches (search term, selected months, ships, price range, night range)
   - Shows "No filters applied" when no filters are active
   - Updated in real-time as filters/searches are applied
+  - Individual removable blue chips for each active filter with close (X) button
+  - "Clear filters" button positioned at the end of the filter chips row to reset all filters when there are filters selected
 
 ### Body - Search Results
 - Have a section header separating the Search and Filter controls and the Search Results. This section header should keep a count of the search results.
@@ -104,19 +109,21 @@ Comprehensive fake dataset as a JSON file (src/data/metrics.json) with 77 cruise
     - Should have an "Expand" button to expand and see the cruises selected to compare
     - Should have a "Collapse" button to collapse the panel back to its pinned view
 
-### Book Now Button
-- Book Now
+### Booking Landing
+- Booking Landing
     - Once the Book Now button is clicked, take user to a Booking Landing page which contains information about the cruise they selected
     - Contains the Staterooms and number of guests they selected
     - Contains the estimated base price as well as a breakdown of price per stateroom and price per person
     - Contains a "Back" button to return to Cruise Search
     - Contains a "Continue" button to continue into the Booking Flow
+    - Users should still be able to configure and reconfigure the staterooms and guests that they selected on the Cruise Search page
 
 ### Booking Flow
 - Booking Flow
-    - Continuing from the Booking Landing page, users should be taken to a multi-step process where they select various aspects of their cruise (including Cabin type, location on ship, cruise add-ons, etc)
-    - Users should still be able to configure and reconfigure the staterooms and guests that they selected on the Cruise Search page
-
+    - Continuing from the Booking Landing page, users should be taken to a multi-step process where they select various aspects of their cruise
+        - Cabin type: various incarnations of the selected staterooms (example: Interior with View, Balcony with Chairs, Luxury Stateroom)
+        - Cruise add-ons
+   
 ### Footer
 - Footer on bottom
     - Dark grey footer with social media links and link tree
@@ -160,9 +167,21 @@ The application has been set up with Vue Router (v4) with the following routes:
 - **Features**:
   - Query parameter handling: cruiseId, stateroomTypes, adults, children, totalPrice, pricePerStateroom, pricePerPerson
   - Displays cruise details (name, dates, duration, ship)
-  - Shows selected stateroom configuration (types, count, guest count)
-  - Pricing card with breakdown: cruise total, per-stateroom, and per-person pricing
-  - Navigation: Back button (returns to home), Continue button (proceeds to booking flow)
+  - **Editable Stateroom Configuration**:
+    - Accordion interface for each stateroom (min 1, max 4)
+    - Add/Remove stateroom buttons (+/- controls with 1-4 stateroom limit)
+    - For each stateroom:
+      - Type selector dropdown (Interior, Oceanview, Balcony, Suite)
+      - Adults count with +/- buttons (min 1 per stateroom, max 4 total per stateroom)
+      - Children count with +/- buttons (min 0, max based on room capacity)
+      - Price display per stateroom type
+    - Remove button per stateroom (disabled if only 1 stateroom remains)
+  - Dynamic pricing recalculation as users modify selections:
+    - Total cruise price across all staterooms
+    - Price per stateroom (total price ÷ number of staterooms)
+    - Price per person (total price ÷ total guests)
+  - Pricing card with breakdown displayed on right side (sticky positioning)
+  - Navigation: Back button (returns to home), Continue button (proceeds to booking flow with updated values)
   - Stateroom type label formatter for display (interior → "Interior", etc.)
 
 #### BookingFlowView.vue
@@ -170,7 +189,13 @@ The application has been set up with Vue Router (v4) with the following routes:
 - **Location**: src/views/BookingFlowView.vue
 - **Features**:
   - Vuetify Stepper component with 3 steps:
-    - **Step 1: Cabin Location** - Radio button selection (Midship, Forward, Aft)
+    - **Step 1: Cabin Type** - Selection of cabin type variants across 4 categories:
+      - Interior: Standard, Premium, Spacious
+      - Oceanview: Standard, Premium with Balcony
+      - Balcony: Standard, Deluxe, Grand
+      - Suite: Grand, Penthouse
+      - Single selection per variant (radio group or select interface)
+      - Optional pricing display per variant where available
     - **Step 2: Add-ons** - Checkboxes for optional services (Beverage Package, Speciality Dining, Internet, Shore Excursions)
     - **Step 3: Review & Confirm** - Summary display with final pricing including add-ons
   - Dynamic pricing: Add-on selections recalculate total cost in real-time

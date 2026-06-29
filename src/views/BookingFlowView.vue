@@ -18,13 +18,20 @@ const pricePerPerson = parseInt(route.query.pricePerPerson as string) || 0
 const cruise = (cruiseData as CruiseDeparture[]).find((c) => c.id === cruiseId)
 
 const currentStep = ref(1)
-const selectedCabinLocations = ref<string[]>([])
+const selectedCabinType = ref<string>('')
 const selectedAddOns = ref<string[]>([])
 
-const cabinLocationOptions = [
-  { id: 'midship', label: 'Midship (Best for comfort)' },
-  { id: 'forward', label: 'Forward (Quieter)' },
-  { id: 'aft', label: 'Aft (Near nightlife)' },
+const cabinTypeOptions = [
+  { id: 'interior-standard', label: 'Interior - Standard', type: 'Interior', price: 0 },
+  { id: 'interior-premium', label: 'Interior - Premium', type: 'Interior', price: 150 },
+  { id: 'interior-spacious', label: 'Interior - Spacious', type: 'Interior', price: 300 },
+  { id: 'oceanview-standard', label: 'Oceanview - Standard', type: 'Oceanview', price: 300 },
+  { id: 'oceanview-premium', label: 'Oceanview - Premium with Balcony', type: 'Oceanview', price: 600 },
+  { id: 'balcony-standard', label: 'Balcony - Standard', type: 'Balcony', price: 600 },
+  { id: 'balcony-deluxe', label: 'Balcony - Deluxe', type: 'Balcony', price: 900 },
+  { id: 'balcony-grand', label: 'Balcony - Grand', type: 'Balcony', price: 1200 },
+  { id: 'suite-grand', label: 'Suite - Grand', type: 'Suite', price: 1500 },
+  { id: 'suite-penthouse', label: 'Suite - Penthouse', type: 'Suite', price: 2000 },
 ]
 
 const addOnOptions = [
@@ -80,7 +87,7 @@ function updateAddOnCost(): void {
 
         <v-stepper v-model="currentStep" class="mb-6">
           <v-stepper-header>
-            <v-stepper-item :complete="currentStep > 1" :value="1" title="Cabin Location" />
+            <v-stepper-item :complete="currentStep > 1" :value="1" title="Cabin Type" />
             <v-divider />
             <v-stepper-item :complete="currentStep > 2" :value="2" title="Add-ons" />
             <v-divider />
@@ -88,11 +95,22 @@ function updateAddOnCost(): void {
           </v-stepper-header>
 
           <v-stepper-window>
-            <!-- Step 1: Cabin Location -->
+            <!-- Step 1: Cabin Type -->
             <v-stepper-window-item :value="1">
               <div class="pa-4">
-                <h3 class="text-subtitle-1 font-weight-bold mb-4">Select Cabin Location</h3>
-                <v-radio-group v-model="selectedCabinLocations" :items="cabinLocationOptions" />
+                <h3 class="text-subtitle-1 font-weight-bold mb-4">Select Cabin Type</h3>
+                <v-radio-group v-model="selectedCabinType">
+                  <div v-for="option in cabinTypeOptions" :key="option.id" class="mb-3">
+                    <v-radio :value="option.id">
+                      <template #label>
+                        <div class="d-flex justify-space-between w-100 ga-4">
+                          <span>{{ option.label }}</span>
+                          <span v-if="option.price > 0" class="text-medium-emphasis">{{ formatCurrency(option.price) }}</span>
+                        </div>
+                      </template>
+                    </v-radio>
+                  </div>
+                </v-radio-group>
               </div>
             </v-stepper-window-item>
 
@@ -140,9 +158,9 @@ function updateAddOnCost(): void {
                       <div class="text-body-1 font-weight-medium">{{ adults }} Adults, {{ children }} Children</div>
                     </div>
                     <div class="mb-3">
-                      <div class="text-body-2 text-medium-emphasis">Cabin Location</div>
+                      <div class="text-body-2 text-medium-emphasis">Cabin Type</div>
                       <div class="text-body-1 font-weight-medium">
-                        {{ cabinLocationOptions.find((o) => o.id === selectedCabinLocations[0])?.label || 'Not selected' }}
+                        {{ cabinTypeOptions.find((o) => o.id === selectedCabinType)?.label || 'Not selected' }}
                       </div>
                     </div>
                   </v-col>

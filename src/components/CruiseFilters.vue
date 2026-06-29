@@ -44,23 +44,26 @@ function resetNightsRange(): void {
           label="Select months"
           variant="outlined"
           multiple
+          chips
+          closable-chips
           hide-details
           density="compact"
           class="mb-3"
-        />
-      </div>
-      <div v-if="selectedMonths.length > 0" class="d-flex flex-wrap ga-2 mb-3">
-        <v-chip
-          v-for="month in selectedMonths"
-          :key="month"
-          closable
-          color="secondary"
-          variant="flat"
-          size="small"
-          @click:close="removeMonth(month)"
         >
-          {{ monthOptions.find((m) => m.value === month)?.label }}
-        </v-chip>
+          <template #chip="{ props: chipProps, item }">
+            <v-chip
+              v-bind="chipProps"
+              closable
+              color="secondary"
+              variant="flat"
+              size="small"
+              class="mr-1"
+              @click:close.stop="removeMonth(item.value)"
+            >
+              {{ item.title }}
+            </v-chip>
+          </template>
+        </v-select>
       </div>
     </div>
 
@@ -73,23 +76,26 @@ function resetNightsRange(): void {
           label="Select ships"
           variant="outlined"
           multiple
+          chips
+          closable-chips
           hide-details
           density="compact"
           class="mb-3"
-        />
-      </div>
-      <div v-if="selectedShips.length > 0" class="d-flex flex-wrap ga-2 mb-3">
-        <v-chip
-          v-for="ship in selectedShips"
-          :key="ship"
-          closable
-          color="secondary"
-          variant="flat"
-          size="small"
-          @click:close="removeShip(ship)"
         >
-          {{ ship }}
-        </v-chip>
+          <template #chip="{ props: chipProps, item }">
+            <v-chip
+              v-bind="chipProps"
+              closable
+              color="secondary"
+              variant="flat"
+              size="small"
+              class="mr-1"
+              @click:close.stop="removeShip(item.value)"
+            >
+              {{ item.title }}
+            </v-chip>
+          </template>
+        </v-select>
       </div>
     </div>
 
@@ -150,6 +156,13 @@ function resetNightsRange(): void {
   display: flex;
   flex-direction: column;
   gap: 1.5rem;
+  padding: 0.75rem 0.875rem 1rem;
+}
+
+@media (min-width: 960px) {
+  .filter-container {
+    padding: 1rem 1.125rem 1.25rem;
+  }
 }
 
 .filter-section {

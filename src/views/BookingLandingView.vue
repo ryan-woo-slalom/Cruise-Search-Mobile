@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { ref, computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import type { CruiseDeparture, StateroomPricing } from '../types/cruise'
 import cruiseData from '../data/metrics.json'
@@ -7,14 +8,86 @@ const router = useRouter()
 const route = useRoute()
 
 const cruiseId = route.query.cruiseId as string
-const stateroomTypes = route.query.stateroomTypes ? (JSON.parse(route.query.stateroomTypes as string) as (keyof StateroomPricing)[]) : ['interior']
-const adults = parseInt(route.query.adults as string) || 0
-const children = parseInt(route.query.children as string) || 0
-const totalPrice = parseInt(route.query.totalPrice as string) || 0
-const pricePerStateroom = parseInt(route.query.pricePerStateroom as string) || 0
-const pricePerPerson = parseInt(route.query.pricePerPerson as string) || 0
-
 const cruise = (cruiseData as CruiseDeparture[]).find((c) => c.id === cruiseId)
+
+// Editable state for staterooms
+interface EditableStateroom {
+  type: keyof StateroomPricing
+  adults: number
+  children: number
+}
+
+const editableStaterooms = ref<EditableStateroom[]>([
+  { type: 'interior', adults: 2, children: 0 },
+])
+
+function addStateroom(): void {
+  if (editableStaterooms.value.length < 4) {
+    editableStaterooms.value.push({ type: 'interior', adults: 2, children: 0 })
+  }
+}
+
+function removeStateroom(index: number): void {
+  if (editableStaterooms.value.length > 1) {
+    editableStaterooms.value.splice(index, 1)
+  }
+}
+
+function incrementAdults(index: number): void {
+  const stateroom = editableStaterooms.value[index]
+  if (stateroom) {
+    const guests = stateroom.adults + stateroom.children
+    if (guests < 4) {
+      stateroom.adults++
+    }
+  }
+}
+
+function decrementAdults(index: number): void {
+  const stateroom = editableStaterooms.value[index]
+  if (stateroom && stateroom.adults > 1) {
+    stateroom.adults--
+  }
+}
+
+function incrementChildren(index: number): void {
+  const stateroom = editableStaterooms.value[index]
+  if (stateroom) {
+    const guests = stateroom.adults + stateroom.children
+    if (guests < 4) {
+      stateroom.children++
+    }
+  }
+}
+
+function decrementChildren(index: number): void {
+  const stateroom = editableStaterooms.value[index]
+  if (stateroom && stateroom.children > 0) {
+    stateroom.children--
+  }
+}
+
+// Computed pricing
+const calculatedPricing = computed(() => {
+  let totalPrice = 0
+  if (cruise && cruise.stateroomPricing) {
+    editableStaterooms.value.forEach((stateroom) => {
+      const price = cruise.stateroomPricing[stateroom.type] ?? 0
+      totalPrice += price
+    })
+  }
+
+  const totalGuests = editableStaterooms.value.reduce((sum, sr) => sum + sr.adults + sr.children, 0)
+  const pricePerStateroom = editableStaterooms.value.length > 0 ? totalPrice / editableStaterooms.value.length : 0
+  const pricePerPerson = totalGuests > 0 ? totalPrice / totalGuests : 0
+
+  return {
+    totalPrice,
+    pricePerStateroom,
+    pricePerPerson,
+    totalGuests,
+  }
+})
 
 function formatCurrency(value: number): string {
   return new Intl.NumberFormat('en-US', {
@@ -52,12 +125,12 @@ function continueToBooking(): void {
     name: 'booking-flow',
     query: {
       cruiseId,
-      stateroomTypes: JSON.stringify(stateroomTypes),
-      adults,
-      children,
-      totalPrice,
-      pricePerStateroom,
-      pricePerPerson,
+      stateroomTypes: JSON.stringify(editableStaterooms.value.map((sr) => sr.type)),
+      adults: editableStaterooms.value.reduce((sum, sr) => sum + sr.adults, 0),
+      children: editableStaterooms.value.reduce((sum, sr) => sum + sr.children, 0),
+      totalPrice: calculatedPricing.value.totalPrice,
+      pricePerStateroom: calculatedPricing.value.pricePerStateroom,
+      pricePerPerson: calculatedPricing.value.pricePerPerson,
     },
   })
 }
@@ -109,36 +182,131 @@ function continueToBooking(): void {
         <div class="mb-8">
           <h2 class="text-h6 font-weight-bold mb-4">Your Selection</h2>
           <v-row>
-            <v-col cols="12" md="6">
-              <div class="mb-4">
-                <div class="text-body-2 text-medium-emphasis">Staterooms</div>
-                <div class="text-body-1 font-weight-medium">{{ stateroomTypes.length }}</div>
-              </div>
-              <div class="mb-4">
-                <div class="text-body-2 text-medium-emphasis">Stateroom Types</div>
-                <div class="text-body-1 font-weight-medium">
-                  {{ stateroomTypes.map((type) => stateroomTypeLabel(type as keyof StateroomPricing)).join(', ') }}
-                </div>
-              </div>
-              <div class="mb-4">
-                <div class="text-body-2 text-medium-emphasis">Guests</div>
-                <div class="text-body-1 font-weight-medium">{{ adults }} Adults, {{ children }} Children</div>
-              </div>
+            <!-- Staterooms Accordion -->
+            <v-col cols="12" md="7">
+              <v-expansion-panels variant="accordion">
+                <v-expansion-panel
+                  v-for="(stateroom, index) in editableStaterooms"
+                  :key="index"
+                >
+                  <template #title>
+                    <div class="d-flex justify-space-between w-100 align-center pr-2">
+                      <span>Stateroom {{ index + 1 }}: {{ stateroomTypeLabel(stateroom.type) }}</span>
+                      <span class="text-caption text-medium-emphasis">
+                        {{ stateroom.adults }} Adults, {{ stateroom.children }} Children
+                      </span>
+                    </div>
+                  </template>
+
+                  <v-card-text>
+                    <div class="mb-4">
+                      <div class="text-body-2 text-medium-emphasis mb-2">Stateroom Type</div>
+                      <v-select
+                        v-model="stateroom.type"
+                        :items="['interior', 'oceanview', 'balcony', 'suite']"
+                        :item-props="(item: any) => ({ title: stateroomTypeLabel(item as keyof StateroomPricing) })"
+                        density="compact"
+                        variant="outlined"
+                      />
+                    </div>
+
+                    <div class="mb-4">
+                      <div class="text-body-2 text-medium-emphasis mb-2">Adults</div>
+                      <div class="d-flex align-center gap-2">
+                        <v-btn
+                          icon="mdi-minus"
+                          size="small"
+                          variant="outlined"
+                          :disabled="stateroom.adults <= 1"
+                          @click="decrementAdults(index)"
+                        />
+                        <span class="text-body-1">{{ stateroom.adults }}</span>
+                        <v-btn
+                          icon="mdi-plus"
+                          size="small"
+                          variant="outlined"
+                          :disabled="stateroom.adults + stateroom.children >= 4"
+                          @click="incrementAdults(index)"
+                        />
+                      </div>
+                    </div>
+
+                    <div class="mb-4">
+                      <div class="text-body-2 text-medium-emphasis mb-2">Children</div>
+                      <div class="d-flex align-center gap-2">
+                        <v-btn
+                          icon="mdi-minus"
+                          size="small"
+                          variant="outlined"
+                          :disabled="stateroom.children <= 0"
+                          @click="decrementChildren(index)"
+                        />
+                        <span class="text-body-1">{{ stateroom.children }}</span>
+                        <v-btn
+                          icon="mdi-plus"
+                          size="small"
+                          variant="outlined"
+                          :disabled="stateroom.adults + stateroom.children >= 4"
+                          @click="incrementChildren(index)"
+                        />
+                      </div>
+                    </div>
+
+                    <div class="text-body-2 mb-4">
+                      <span class="text-medium-emphasis">Price: </span>
+                      <span class="font-weight-bold">{{ formatCurrency(cruise && cruise.stateroomPricing ? cruise.stateroomPricing[stateroom.type] : 0) }}</span>
+                    </div>
+
+                    <v-btn
+                      v-if="editableStaterooms.length > 1"
+                      size="small"
+                      color="error"
+                      variant="text"
+                      @click="removeStateroom(index)"
+                    >
+                      Remove Stateroom
+                    </v-btn>
+                  </v-card-text>
+                </v-expansion-panel>
+              </v-expansion-panels>
+
+              <v-btn
+                v-if="editableStaterooms.length < 4"
+                class="mt-4"
+                color="primary"
+                variant="text"
+                prepend-icon="mdi-plus"
+                @click="addStateroom"
+              >
+                Add Stateroom
+              </v-btn>
             </v-col>
-            <v-col cols="12" md="6">
-              <v-card variant="outlined" class="pa-4">
+
+            <!-- Pricing Card -->
+            <v-col cols="12" md="5">
+              <v-card variant="outlined" class="pa-4 sticky" style="top: 20px">
                 <div class="mb-4">
                   <div class="text-body-2 text-medium-emphasis mb-1">Estimated Total</div>
-                  <div class="text-h4 font-weight-bold">{{ formatCurrency(totalPrice) }}</div>
+                  <div class="text-h4 font-weight-bold">{{ formatCurrency(calculatedPricing.totalPrice) }}</div>
                 </div>
                 <div class="mb-2">
                   <div class="text-caption text-medium-emphasis">
-                    Price per stateroom: {{ formatCurrency(pricePerStateroom) }}
+                    Staterooms: {{ editableStaterooms.length }}
+                  </div>
+                </div>
+                <div class="mb-2">
+                  <div class="text-caption text-medium-emphasis">
+                    Total Guests: {{ calculatedPricing.totalGuests }}
+                  </div>
+                </div>
+                <div class="mb-2">
+                  <div class="text-caption text-medium-emphasis">
+                    Price per stateroom: {{ formatCurrency(calculatedPricing.pricePerStateroom) }}
                   </div>
                 </div>
                 <div>
                   <div class="text-caption text-medium-emphasis">
-                    Price per person: {{ formatCurrency(pricePerPerson) }}
+                    Price per person: {{ formatCurrency(calculatedPricing.pricePerPerson) }}
                   </div>
                 </div>
               </v-card>
