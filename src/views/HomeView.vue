@@ -130,7 +130,7 @@ const appliedFiltersInline = computed(() => {
   }
 
   if (selectedMinPrice !== minPrice || selectedMaxPrice !== maxPrice) {
-    parts.push(`Price: ${formatCurrency(selectedMinPrice)}-${formatCurrency(selectedMaxPrice)}`)
+    parts.push(`Price (per ${pricingLabel.value}): ${formatCurrency(selectedMinPrice)}-${formatCurrency(selectedMaxPrice)}`)
   }
 
   if (selectedMinNights !== minNights || selectedMaxNights !== maxNights) {
@@ -143,6 +143,74 @@ const appliedFiltersInline = computed(() => {
 
   return parts.join(' | ')
 })
+
+const activeFilterCount = computed(() => {
+  let count = 0
+  count += selectedMonths.value.length
+  count += selectedShips.value.length
+  if (priceRange.value[0] !== minPrice || priceRange.value[1] !== maxPrice) count++
+  if (nightsRange.value[0] !== minNights || nightsRange.value[1] !== maxNights) count++
+  return count
+})
+
+const individualFilters = computed(() => {
+  const filters: Array<{ type: string; label: string; id?: string }> = []
+  
+  selectedMonths.value.forEach((monthValue) => {
+    const monthLabel = monthOptions.value.find((m) => m.value === monthValue)?.label
+    if (monthLabel) {
+      filters.push({ type: 'month', label: monthLabel, id: monthValue })
+    }
+  })
+  
+  selectedShips.value.forEach((ship) => {
+    filters.push({ type: 'ship', label: ship, id: ship })
+  })
+  
+  if (priceRange.value[0] !== minPrice || priceRange.value[1] !== maxPrice) {
+    const [minPriceSelected = minPrice, maxPriceSelected = maxPrice] = priceRange.value
+    filters.push({
+      type: 'price',
+      label: `Price: ${formatCurrency(minPriceSelected)}-${formatCurrency(maxPriceSelected)}`
+    })
+  }
+  
+  if (nightsRange.value[0] !== minNights || nightsRange.value[1] !== maxNights) {
+    const [minNightsSelected = minNights, maxNightsSelected = maxNights] = nightsRange.value
+    filters.push({
+      type: 'nights',
+      label: `Nights: ${minNightsSelected}-${maxNightsSelected}`
+    })
+  }
+  
+  return filters
+})
+
+function removeFilter(filter: (typeof individualFilters.value)[0]): void {
+  if (filter.type === 'month' && filter.id) {
+    selectedMonths.value = selectedMonths.value.filter((m) => m !== filter.id)
+  } else if (filter.type === 'ship' && filter.id) {
+    selectedShips.value = selectedShips.value.filter((s) => s !== filter.id)
+  } else if (filter.type === 'price') {
+    priceRange.value = [minPrice, maxPrice]
+  } else if (filter.type === 'nights') {
+    nightsRange.value = [minNights, maxNights]
+  }
+}
+
+function clearAllFilters(): void {
+  selectedMonths.value = []
+  selectedShips.value = []
+  priceRange.value = [minPrice, maxPrice]
+  nightsRange.value = [minNights, maxNights]
+}
+
+function clearFilters(): void {
+  selectedMonths.value = []
+  selectedShips.value = []
+  priceRange.value = [minPrice, maxPrice]
+  nightsRange.value = [minNights, maxNights]
+}
 
 const sortOptions: { title: string; value: SortMode }[] = [
   { title: 'Recommended', value: 'recommended' },
@@ -628,13 +696,13 @@ function destinationImage(destination: string): string {
   const value = destination.toLowerCase()
 
   const openSourcePhotos = {
-    mediterranean: 'https://images.pexels.com/photos/3278215/pexels-photo-3278215.jpeg?auto=compress&cs=tinysrgb&w=1600',
-    caribbean: 'https://images.pexels.com/photos/1007836/pexels-photo-1007836.jpeg?auto=compress&cs=tinysrgb&w=1600',
-    alaska: 'https://images.pexels.com/photos/813011/pexels-photo-813011.jpeg?auto=compress&cs=tinysrgb&w=1600',
-    nordic: 'https://images.pexels.com/photos/1268855/pexels-photo-1268855.jpeg?auto=compress&cs=tinysrgb&w=1600',
-    pacific: 'https://images.pexels.com/photos/346529/pexels-photo-346529.jpeg?auto=compress&cs=tinysrgb&w=1600',
-    transatlantic: 'https://images.pexels.com/photos/1371360/pexels-photo-1371360.jpeg?auto=compress&cs=tinysrgb&w=1600',
-    default: 'https://images.pexels.com/photos/3278216/pexels-photo-3278216.jpeg?auto=compress&cs=tinysrgb&w=1600',
+    mediterranean: '/images/mediterranean.jpg',
+    caribbean: '/images/caribbean.jpg',
+    alaska: '/images/alaska.jpg',
+    nordic: '/images/nordic.jpg',
+    pacific: '/images/pacific.jpg',
+    transatlantic: '/images/transatlantic.jpg',
+    default: '/images/default.jpg',
   }
 
   if (value.includes('barcelona') || value.includes('marseille') || value.includes('mediterranean')) {
@@ -877,6 +945,7 @@ const compareRows = computed(() => [
               :max-price="maxPrice"
               :min-nights="minNights"
               :max-nights="maxNights"
+              :pricing-mode="pricingMode"
             />
           </v-card-text>
         </v-card>
@@ -885,15 +954,17 @@ const compareRows = computed(() => [
       <v-col cols="12" md="9">
         <v-card rounded="xl" elevation="2" class="toolbar-shell mb-4 surface-card">
           <v-card-text class="py-3 px-3 px-sm-4 px-md-5 d-flex flex-wrap align-center ga-2 ga-sm-3">
-          <v-btn
-            v-if="!mdAndUp"
-            color="secondary"
-            prepend-icon="mdi-filter-variant"
-            rounded="pill"
-            @click="mobileFiltersOpen = true"
-          >
-            Filters
-          </v-btn>
+          <div v-if="!mdAndUp" class="w-100">
+            <v-btn
+              color="secondary"
+              prepend-icon="mdi-filter-variant"
+              rounded="pill"
+              class="w-100"
+              @click="mobileFiltersOpen = true"
+            >
+              Filters <span v-if="activeFilterCount > 0">({{ activeFilterCount }})</span>
+            </v-btn>
+          </div>
 
           <div class="control-group">
             <span class="control-label">View by</span>
@@ -941,10 +1012,24 @@ const compareRows = computed(() => [
 
         <div class="results-header mb-3">
           <p class="text-overline mb-1 section-kicker">Search Results</p>
-          <h2 class="text-h6 mb-0">
+          <h2 class="text-h6 mb-3">
             Cruises matching your search ({{ resultsCount }})
-            <span class="results-filters-inline"> - {{ appliedFiltersInline }}</span>
           </h2>
+          <div v-if="activeFilterCount > 0" class="d-flex flex-wrap ga-2 align-center mb-2">
+            <span class="text-body-2 text-medium-emphasis">Filters selected:</span>
+            <v-chip
+              v-for="filter in individualFilters"
+              :key="`${filter.type}-${filter.id}`"
+              closable
+              color="secondary"
+              variant="flat"
+              size="small"
+              @click:close="removeFilter(filter)"
+            >
+              {{ filter.label }}
+            </v-chip>
+          </div>
+          <div v-else class="text-body-2 text-medium-emphasis mb-2">No filters applied</div>
         </div>
 
         <v-row v-if="activeView === 'itinerary'">
@@ -1039,7 +1124,7 @@ const compareRows = computed(() => [
     <v-dialog v-model="mobileFiltersOpen" fullscreen>
       <v-card class="mobile-filter-shell">
         <v-toolbar color="white" elevation="0">
-          <v-toolbar-title>Filters</v-toolbar-title>
+          <v-toolbar-title>Filters <span v-if="activeFilterCount > 0" class="text-subtitle-2">({{ activeFilterCount }} selected)</span></v-toolbar-title>
           <v-spacer />
           <v-btn icon="mdi-close" variant="text" @click="mobileFiltersOpen = false" />
         </v-toolbar>
@@ -1055,6 +1140,7 @@ const compareRows = computed(() => [
             :max-price="maxPrice"
             :min-nights="minNights"
             :max-nights="maxNights"
+            :pricing-mode="pricingMode"
           />
         </v-card-text>
       </v-card>
@@ -1400,6 +1486,10 @@ const compareRows = computed(() => [
   font-size: 0.78rem;
   font-weight: 500;
   color: #4a6279;
+}
+
+.results-filters-chip {
+  margin-top: 8px;
 }
 
 .quickview-titlebar {
