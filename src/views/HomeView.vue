@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import { useDisplay } from 'vuetify'
 import cruiseData from '../data/metrics.json'
 import CruiseFilters from '../components/CruiseFilters.vue'
@@ -15,6 +16,7 @@ type SortMode = 'recommended' | 'highestRated' | 'priceLowHigh' | 'priceHighLow'
 type RoomConfig = {
   adults: number
   children: number
+  stateroomType: keyof StateroomPricing
 }
 
 type QuickViewRoomConfig = RoomConfig & {
@@ -30,6 +32,7 @@ type ItineraryGroup = {
 }
 
 const cruises = cruiseData as CruiseDeparture[]
+const router = useRouter()
 const { mdAndUp } = useDisplay()
 
 const minPrice = Math.min(...cruises.map((cruise) => cruise.pricePerPerson))
@@ -38,8 +41,9 @@ const minNights = Math.min(...cruises.map((cruise) => cruise.nights))
 const maxNights = Math.max(...cruises.map((cruise) => cruise.nights))
 
 const searchQuery = ref('')
+const appliedSearchQuery = ref('')
 const pricingMode = ref<PricingMode>('person')
-const staterooms = ref<RoomConfig[]>([{ adults: 2, children: 0 }])
+const staterooms = ref<RoomConfig[]>([{ adults: 2, children: 0, stateroomType: 'interior' }])
 const selectedMonths = ref<string[]>([])
 const selectedShips = ref<string[]>([])
 const priceRange = ref<number[]>([minPrice, maxPrice])
@@ -106,7 +110,7 @@ const sortModeLabel = computed(() => {
 
 const appliedFiltersInline = computed(() => {
   const parts: string[] = []
-  const query = searchQuery.value.trim()
+  const query = appliedSearchQuery.value.trim()
   const [selectedMinPrice = minPrice, selectedMaxPrice = maxPrice] = priceRange.value
   const [selectedMinNights = minNights, selectedMaxNights = maxNights] = nightsRange.value
 
@@ -148,7 +152,7 @@ const sortOptions: { title: string; value: SortMode }[] = [
 ]
 
 const filteredCruises = computed(() => {
-  const query = searchQuery.value.trim().toLowerCase()
+  const query = appliedSearchQuery.value.trim().toLowerCase()
   const [selectedMinPrice = minPrice, selectedMaxPrice = maxPrice] = priceRange.value
   const [selectedMinNights = minNights, selectedMaxNights = maxNights] = nightsRange.value
 
@@ -157,7 +161,8 @@ const filteredCruises = computed(() => {
     const matchesQuery =
       query.length === 0 ||
       cruise.itineraryName.toLowerCase().includes(query) ||
-      cruise.shipName.toLowerCase().includes(query)
+      cruise.shipName.toLowerCase().includes(query) ||
+      cruise.itineraryMap.toLowerCase().includes(query)
 
     const matchesMonth =
       selectedMonths.value.length === 0 || selectedMonths.value.includes(cruiseMonth)
@@ -387,7 +392,11 @@ function minPriceInItineraryGroup(group: ItineraryGroup): number {
 }
 
 function addStateroom(): void {
-  staterooms.value.push({ adults: 2, children: 0 })
+  if (staterooms.value.length >= 4) {
+    return
+  }
+
+  staterooms.value.push({ adults: 2, children: 0, stateroomType: 'interior' })
 }
 
 function removeStateroom(index: number): void {
@@ -463,6 +472,10 @@ function stateroomTypeLabel(type: keyof StateroomPricing): string {
   return labels[type]
 }
 
+function formatStateroomLabel(room: RoomConfig, index: number): string {
+  return `Stateroom ${index + 1} - ${stateroomTypeLabel(room.stateroomType)}, ${room.adults} Adult${room.adults !== 1 ? 's' : ''}, ${room.children} Child${room.children !== 1 ? 'ren' : ''}`
+}
+
 function toggleSaved(id: string): void {
   savedIds.value = savedIds.value.includes(id)
     ? savedIds.value.filter((item) => item !== id)
@@ -502,6 +515,10 @@ function openQuickView(cruiseSet: CruiseDeparture[], title: string): void {
 }
 
 function addQuickViewStateroom(): void {
+  if (quickViewStaterooms.value.length >= 4) {
+    return
+  }
+
   quickViewStaterooms.value.push({ adults: 2, children: 0, stateroomType: 'interior' })
 }
 
@@ -649,6 +666,44 @@ function expandComparePanel(): void {
   comparePanelCollapsed.value = false
 }
 
+function performSearch(): void {
+  appliedSearchQuery.value = searchQuery.value
+}
+
+function goToBookingLanding(): void {
+  if (!quickViewSelectedCruise.value) {
+    return
+  }
+  router.push({
+    name: 'booking-landing',
+    query: {
+      cruiseId: quickViewSelectedCruise.value.id,
+      stateroomTypes: JSON.stringify(quickViewStaterooms.value.map((r) => r.stateroomType)),
+      adults: quickViewTotalAdults.value,
+      children: quickViewTotalChildren.value,
+      totalPrice: guestCalculatorTotal.value,
+      pricePerStateroom: guestCalculatorPerStateroom.value,
+      pricePerPerson: guestCalculatorPerGuest.value,
+    },
+  })
+}
+
+function bookCruiseFromCard(cruise: CruiseDeparture): void {
+  // Directly navigate to booking landing with default stateroom configuration
+  router.push({
+    name: 'booking-landing',
+    query: {
+      cruiseId: cruise.id,
+      stateroomTypes: JSON.stringify(['interior']),
+      adults: 2,
+      children: 0,
+      totalPrice: cruise.stateroomPricing.interior,
+      pricePerStateroom: cruise.stateroomPricing.interior,
+      pricePerPerson: cruise.pricePerPerson,
+    },
+  })
+}
+
 function clearCompareSelections(): void {
   compareIds.value = []
   comparePanelCollapsed.value = true
@@ -692,29 +747,71 @@ const compareRows = computed(() => [
         </p>
         <v-row class="align-center mt-1" dense>
           <v-col cols="12" md="7">
-            <v-text-field
-              v-model="searchQuery"
-              label="Search itineraries, ships, destinations"
-              prepend-inner-icon="mdi-magnify"
-              variant="outlined"
-              hide-details
-              density="comfortable"
-              bg-color="white"
-            />
+            <div class="d-flex ga-2 align-center">
+              <v-text-field
+                v-model="searchQuery"
+                label="Search itineraries, ships, destinations"
+                prepend-inner-icon="mdi-magnify"
+                variant="outlined"
+                hide-details
+                density="comfortable"
+                bg-color="white"
+                class="flex-grow-1"
+              />
+              <v-btn
+                color="primary"
+                prepend-icon="mdi-magnify"
+                variant="flat"
+                size="large"
+                @click="performSearch"
+              >
+                Search
+              </v-btn>
+            </div>
           </v-col>
           <v-col cols="12" md="5">
             <v-card variant="outlined" class="pa-2 pa-md-3 guest-panel h-100">
               <div class="d-flex justify-space-between align-center mb-2">
                 <div class="text-subtitle-2">Staterooms</div>
                 <div class="d-flex ga-1">
-                  <v-btn icon="mdi-minus" size="x-small" variant="tonal" :disabled="stateroomCount <= 1" @click="removeStateroom(staterooms.length - 1)" />
-                  <v-btn icon="mdi-plus" size="x-small" variant="tonal" @click="addStateroom" />
+                  <v-btn icon="mdi-plus" size="x-small" variant="tonal" :disabled="stateroomCount >= 4" @click="addStateroom" />
                 </div>
               </div>
 
               <v-expansion-panels variant="accordion">
-                <v-expansion-panel v-for="(room, index) in staterooms" :key="index" :title="`Stateroom ${index + 1}`" rounded="lg">
+                <v-expansion-panel v-for="(room, index) in staterooms" :key="index" rounded="lg">
+                  <template #title>
+                    <div class="d-flex align-center justify-space-between w-100 ga-3">
+                      <div class="room-header-wrap">
+                        <span class="font-weight-medium">{{ formatStateroomLabel(room, index) }}</span>
+                      </div>
+                      <v-btn
+                        icon="mdi-trash-can-outline"
+                        size="x-small"
+                        variant="text"
+                        color="secondary"
+                        :disabled="stateroomCount <= 1"
+                        :aria-label="`Remove stateroom ${index + 1}`"
+                        @click.stop="removeStateroom(index)"
+                      />
+                    </div>
+                  </template>
                   <v-expansion-panel-text>
+                    <div class="mb-3">
+                      <div class="text-body-2 font-weight-medium mb-2">Type</div>
+                      <v-select
+                        v-model="room.stateroomType"
+                        :items="[
+                          { title: 'Interior', value: 'interior' },
+                          { title: 'Oceanview', value: 'oceanview' },
+                          { title: 'Balcony', value: 'balcony' },
+                          { title: 'Suite', value: 'suite' },
+                        ]"
+                        density="compact"
+                        variant="outlined"
+                      />
+                    </div>
+
                     <div class="d-flex justify-space-between align-center mb-3">
                       <div>
                         <div class="text-body-2 font-weight-medium">Adults</div>
@@ -856,6 +953,7 @@ const compareRows = computed(() => [
               @save="toggleSaved"
               @compare="toggleCompare"
               @quickview="openQuickView"
+              @book="bookCruiseFromCard"
             />
           </v-col>
         </v-row>
@@ -874,6 +972,7 @@ const compareRows = computed(() => [
               @save="toggleSaved"
               @compare="toggleCompare"
               @quickview="openQuickView"
+              @book="bookCruiseFromCard"
             />
           </v-col>
         </v-row>
@@ -1028,11 +1127,12 @@ const compareRows = computed(() => [
                 />
 
                 <div class="d-flex align-center justify-space-between mb-3 ga-2 flex-wrap">
-                  <h3 class="text-subtitle-1 font-weight-bold mb-0">Configure your cruise</h3>
+                  <h3 class="text-subtitle-1 font-weight-bold mb-0">Staterooms</h3>
                   <v-btn
                     size="small"
                     variant="outlined"
                     prepend-icon="mdi-plus"
+                    :disabled="quickViewStateroomCount >= 4"
                     @click="addQuickViewStateroom"
                   >
                     Add a stateroom
@@ -1043,20 +1143,44 @@ const compareRows = computed(() => [
                   <v-expansion-panel
                     v-for="(room, index) in quickViewStaterooms"
                     :key="`quick-room-${index}`"
-                    :title="`Stateroom ${index + 1}`"
                     rounded="lg"
                   >
                     <template #title>
-                      <div class="room-header-wrap">
-                        <span class="font-weight-medium">Stateroom {{ index + 1 }}</span>
-                        <span class="text-caption text-medium-emphasis">
-                          {{ room.adults }} Adults, {{ room.children }} Children • {{ stateroomTypeLabel(room.stateroomType) }}
-                        </span>
+                      <div class="d-flex align-center justify-space-between w-100 ga-3">
+                        <div class="room-header-wrap">
+                          <span class="font-weight-medium">{{ formatStateroomLabel(room, index) }}</span>
+                        </div>
+                        <v-btn
+                          icon="mdi-trash-can-outline"
+                          size="x-small"
+                          variant="text"
+                          color="secondary"
+                          :disabled="quickViewStateroomCount <= 1"
+                          :aria-label="`Remove quickview stateroom ${index + 1}`"
+                          @click.stop="removeQuickViewStateroom(index)"
+                        />
                       </div>
                     </template>
                     <v-expansion-panel-text>
-                      <div class="d-flex justify-space-between align-center mb-2">
-                        <span class="text-body-2 font-weight-medium">Adults</span>
+                      <div class="mb-3">
+                        <div class="text-body-2 font-weight-medium mb-2">Type</div>
+                        <v-select
+                          v-model="room.stateroomType"
+                          :items="[
+                            { title: 'Interior', value: 'interior' },
+                            { title: 'Oceanview', value: 'oceanview' },
+                            { title: 'Balcony', value: 'balcony' },
+                            { title: 'Suite', value: 'suite' },
+                          ]"
+                          density="compact"
+                          variant="outlined"
+                        />
+                      </div>
+                      <div class="d-flex justify-space-between align-center mb-3">
+                        <div>
+                          <div class="text-body-2 font-weight-medium">Adults</div>
+                          <div class="text-caption text-medium-emphasis">Ages 18+</div>
+                        </div>
                         <div class="d-flex align-center ga-2">
                           <v-btn
                             icon="mdi-minus"
@@ -1074,8 +1198,11 @@ const compareRows = computed(() => [
                         </div>
                       </div>
 
-                      <div class="d-flex justify-space-between align-center mb-3">
-                        <span class="text-body-2 font-weight-medium">Children</span>
+                      <div class="d-flex justify-space-between align-center">
+                        <div>
+                          <div class="text-body-2 font-weight-medium">Children</div>
+                          <div class="text-caption text-medium-emphasis">Under 18</div>
+                        </div>
                         <div class="d-flex align-center ga-2">
                           <v-btn
                             icon="mdi-minus"
@@ -1092,41 +1219,10 @@ const compareRows = computed(() => [
                           />
                         </div>
                       </div>
-
-                      <v-select
-                        v-model="room.stateroomType"
-                        label="Stateroom type"
-                        variant="outlined"
-                        density="compact"
-                        hide-details
-                        class="mb-3"
-                        :items="[
-                          { title: 'Interior', value: 'interior' },
-                          { title: 'Oceanview', value: 'oceanview' },
-                          { title: 'Balcony', value: 'balcony' },
-                          { title: 'Suite', value: 'suite' },
-                        ]"
-                      />
-
-                      <v-btn
-                        size="x-small"
-                        variant="text"
-                        color="secondary"
-                        :disabled="quickViewStateroomCount <= 1"
-                        @click="removeQuickViewStateroom(index)"
-                      >
-                        Remove stateroom
-                      </v-btn>
+                      <p class="text-caption text-medium-emphasis mt-2 mb-0">Max 4 guests per stateroom and at least 1 adult.</p>
                     </v-expansion-panel-text>
                   </v-expansion-panel>
                 </v-expansion-panels>
-                <p class="text-caption text-medium-emphasis mt-3 mb-0">
-                  Quick view selection: {{ quickViewGuestSummary }}
-                </p>
-                <p class="text-caption text-medium-emphasis mt-1 mb-0">
-                  Max 4 guests per stateroom and at least 1 adult.
-                </p>
-
                 <div class="quickview-pricing mt-4">
                   <div class="text-body-2 text-medium-emphasis mb-1">Estimated total</div>
                   <div class="text-h4 font-weight-bold mb-2">{{ formatCurrency(guestCalculatorTotal) }}</div>
@@ -1156,7 +1252,7 @@ const compareRows = computed(() => [
         <v-divider />
         <v-card-actions class="justify-end px-4 pb-4 px-sm-5 pb-sm-5">
           <v-btn variant="text" @click="quickViewOpen = false">Close</v-btn>
-          <v-btn color="primary" variant="flat">Book now</v-btn>
+          <v-btn color="primary" variant="flat" @click="goToBookingLanding">Book now</v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>

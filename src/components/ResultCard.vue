@@ -25,6 +25,7 @@ const emit = defineEmits<{
   save: [id: string]
   compare: [id: string]
   quickview: [cruiseSet: CruiseDeparture[], title: string]
+  book: [cruise: CruiseDeparture]
 }>()
 
 const dateFormatter = new Intl.DateTimeFormat('en-US', {
@@ -193,7 +194,7 @@ function handleImageError(): void {
     <v-card-actions class="px-4 pb-5 pt-3 px-sm-5 pb-sm-5 px-md-6 pb-md-6 card-actions">
       <v-spacer />
       <v-btn size="small" variant="outlined" @click="openQuickView">Quick view</v-btn>
-      <v-btn size="small" color="primary" variant="flat">Book now</v-btn>
+      <v-btn size="small" color="primary" variant="flat" @click="emit('book', cruise)">Book now</v-btn>
     </v-card-actions>
   </v-card>
 </template>
