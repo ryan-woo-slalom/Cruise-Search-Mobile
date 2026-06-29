@@ -112,10 +112,14 @@ Comprehensive fake dataset as a JSON file (src/data/metrics.json) with 77 cruise
 ### Booking Landing
 - Booking Landing
     - Once the Book Now button is clicked, take user to a Booking Landing page which contains information about the cruise they selected
+    - Contains a Sail Date dropdown so users can switch between available departure dates for that itinerary
+    - Changing Sail Date updates the selected departure details and recalculates pricing
     - Contains the Staterooms and number of guests they selected
     - Contains the estimated base price as well as a breakdown of price per stateroom and price per person
-    - Contains a "Back" button to return to Cruise Search
+    - Contains a "Back" button aligned to the left at the bottom to return to Cruise Search
+    - Contains a "Save Cruise" button to save the current Booking Landing configuration to Saved Cruises
     - Contains a "Continue" button to continue into the Booking Flow
+    - Bottom actions are split: Back on the left, Save Cruise and Continue grouped on the right
     - Users should still be able to configure and reconfigure the staterooms and guests that they selected on the Cruise Search page
 
 ### Booking Flow
@@ -165,8 +169,14 @@ The application has been set up with Vue Router (v4) with the following routes:
 - **Purpose**: Displays a summary of the cruise booking before users proceed to the multi-step booking process
 - **Location**: src/views/BookingLandingView.vue
 - **Features**:
+  - Back button at the top and at the bottom to return to Cruise Search
+  - Title heading of the cruise name with a big splash image of the cruise (same one used for the cruise card)
   - Query parameter handling: cruiseId, stateroomTypes, adults, children, totalPrice, pricePerStateroom, pricePerPerson
-  - Displays cruise details (name, dates, duration, ship)
+  - Displays cruise details (name, date range, duration, ship)
+  - **Sail Date Selection**:
+    - Dropdown of available departures for the selected itinerary
+    - Selecting a new date switches the active departure on Booking Landing
+    - Duration and date-dependent pricing update immediately when date changes
   - **Editable Stateroom Configuration**:
     - Accordion interface for each stateroom (min 1, max 4)
     - Add/Remove stateroom buttons (+/- controls with 1-4 stateroom limit)
@@ -177,11 +187,13 @@ The application has been set up with Vue Router (v4) with the following routes:
       - Price display per stateroom type
     - Remove button per stateroom (disabled if only 1 stateroom remains)
   - Dynamic pricing recalculation as users modify selections:
+    - Date change recalculates total based on the selected departure's stateroom pricing
     - Total cruise price across all staterooms
     - Price per stateroom (total price ÷ number of staterooms)
     - Price per person (total price ÷ total guests)
   - Pricing card with breakdown displayed on right side (sticky positioning)
-  - Navigation: Back button (returns to home), Continue button (proceeds to booking flow with updated values)
+  - Save Cruise button stores the currently selected departure and stateroom configuration in Saved Cruises
+  - Navigation: Back button (left-aligned, returns to home), Save Cruise and Continue buttons on right (Continue proceeds to booking flow with updated values)
   - Stateroom type label formatter for display (interior → "Interior", etc.)
 
 #### BookingFlowView.vue

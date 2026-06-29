@@ -2,29 +2,138 @@
 import { ref, computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import type { CruiseDeparture, StateroomPricing } from '../types/cruise'
+import type { SavedCruiseConfig } from '../types/savedCruise'
 import cruiseData from '../data/metrics.json'
+import { useSavedCruises } from '../composables/useSavedCruises'
 
 const router = useRouter()
 const route = useRoute()
+const cruises = cruiseData as CruiseDeparture[]
+const { addSavedCruise } = useSavedCruises()
 
 const cruiseId = route.query.cruiseId as string
-const cruise = (cruiseData as CruiseDeparture[]).find((c) => c.id === cruiseId)
+const initialCruise = cruises.find((c) => c.id === cruiseId) ?? cruises[0]
+const selectedCruiseId = ref(initialCruise?.id ?? '')
+const cruise = computed(() => cruises.find((c) => c.id === selectedCruiseId.value))
+const relatedDepartures = computed(() => {
+  if (!cruise.value) {
+    return [] as CruiseDeparture[]
+  }
+
+  return cruises
+    .filter((item) => item.itineraryName === cruise.value?.itineraryName)
+    .sort((a, b) => a.startDate.localeCompare(b.startDate))
+})
+const sailDateOptions = computed(() =>
+  relatedDepartures.value.map((departure) => ({
+    value: departure.id,
+    title: `${formatDate(departure.startDate)} - ${formatDate(departure.endDate)} (${departure.nights} nights)`,
+  })),
+)
+const queryStateroomTypes = parseStateroomTypes(route.query.stateroomTypes)
+const queryAdults = Math.max(parseInt(route.query.adults as string) || 2, 1)
+const queryChildren = Math.max(parseInt(route.query.children as string) || 0, 0)
 
 // Editable state for staterooms
 interface EditableStateroom {
-  type: keyof StateroomPricing
+  stateroomType: keyof StateroomPricing
   adults: number
   children: number
 }
 
 const editableStaterooms = ref<EditableStateroom[]>([
-  { type: 'interior', adults: 2, children: 0 },
+  ...buildInitialStaterooms(queryStateroomTypes, queryAdults, queryChildren),
 ])
+
+const stateroomCount = computed(() => editableStaterooms.value.length)
+const totalAdults = computed(() => editableStaterooms.value.reduce((sum, room) => sum + room.adults, 0))
+const totalChildren = computed(() => editableStaterooms.value.reduce((sum, room) => sum + room.children, 0))
+const guestSummary = computed(
+  () => `${stateroomCount.value} staterooms • ${totalAdults.value} Adults, ${totalChildren.value} Children`,
+)
+
+const heroImageUrl = computed(() => {
+  if (!cruise.value) {
+    return '/images/default.jpg'
+  }
+
+  const destination = cruise.value.itineraryMap.split('->')[1]?.trim() ?? cruise.value.itineraryName
+  return destinationImage(destination)
+})
 
 function addStateroom(): void {
   if (editableStaterooms.value.length < 4) {
-    editableStaterooms.value.push({ type: 'interior', adults: 2, children: 0 })
+    editableStaterooms.value.push({ stateroomType: 'interior', adults: 2, children: 0 })
   }
+}
+
+function parseStateroomTypes(value: unknown): (keyof StateroomPricing)[] {
+  if (typeof value !== 'string') {
+    return ['interior']
+  }
+
+  try {
+    const parsed = JSON.parse(value) as string[]
+    const allowed: (keyof StateroomPricing)[] = ['interior', 'oceanview', 'balcony', 'suite']
+    const sanitized = parsed.filter((item): item is keyof StateroomPricing =>
+      allowed.includes(item as keyof StateroomPricing),
+    )
+    return sanitized.length > 0 ? sanitized.slice(0, 4) : ['interior']
+  } catch {
+    return ['interior']
+  }
+}
+
+function buildInitialStaterooms(
+  types: (keyof StateroomPricing)[],
+  adults: number,
+  children: number,
+): EditableStateroom[] {
+  const roomCount = Math.min(Math.max(types.length, 1), 4)
+  const initialRooms: EditableStateroom[] = types.slice(0, roomCount).map((stateroomType) => ({
+    stateroomType,
+    adults: 1,
+    children: 0,
+  }))
+
+  let remainingAdults = adults - roomCount
+  let remainingChildren = children
+
+  while (remainingAdults > 0) {
+    let allocated = false
+    for (const room of initialRooms) {
+      if (room.adults + room.children < 4) {
+        room.adults += 1
+        remainingAdults -= 1
+        allocated = true
+        if (remainingAdults <= 0) {
+          break
+        }
+      }
+    }
+    if (!allocated) {
+      break
+    }
+  }
+
+  while (remainingChildren > 0) {
+    let allocated = false
+    for (const room of initialRooms) {
+      if (room.adults + room.children < 4) {
+        room.children += 1
+        remainingChildren -= 1
+        allocated = true
+        if (remainingChildren <= 0) {
+          break
+        }
+      }
+    }
+    if (!allocated) {
+      break
+    }
+  }
+
+  return initialRooms
 }
 
 function removeStateroom(index: number): void {
@@ -70,9 +179,9 @@ function decrementChildren(index: number): void {
 // Computed pricing
 const calculatedPricing = computed(() => {
   let totalPrice = 0
-  if (cruise && cruise.stateroomPricing) {
+  if (cruise.value && cruise.value.stateroomPricing) {
     editableStaterooms.value.forEach((stateroom) => {
-      const price = cruise.stateroomPricing[stateroom.type] ?? 0
+      const price = cruise.value!.stateroomPricing[stateroom.stateroomType] ?? 0
       totalPrice += price
     })
   }
@@ -116,16 +225,92 @@ function stateroomTypeLabel(type: keyof StateroomPricing): string {
   return labels[type]
 }
 
+function formatStateroomLabel(room: EditableStateroom, index: number): string {
+  return `Stateroom ${index + 1} - ${stateroomTypeLabel(room.stateroomType)}, ${room.adults} Adult${room.adults !== 1 ? 's' : ''}, ${room.children} Child${room.children !== 1 ? 'ren' : ''}`
+}
+
+function destinationImage(destination: string): string {
+  const value = destination.toLowerCase()
+
+  const openSourcePhotos = {
+    mediterranean: '/images/mediterranean.jpg',
+    caribbean: '/images/caribbean.jpg',
+    alaska: '/images/alaska.jpg',
+    nordic: '/images/nordic.jpg',
+    pacific: '/images/pacific.jpg',
+    transatlantic: '/images/transatlantic.jpg',
+    default: '/images/default.jpg',
+  }
+
+  if (value.includes('barcelona') || value.includes('marseille') || value.includes('mediterranean')) {
+    return openSourcePhotos.mediterranean
+  }
+
+  if (value.includes('miami') || value.includes('nassau') || value.includes('cozumel') || value.includes('caribbean')) {
+    return openSourcePhotos.caribbean
+  }
+
+  if (value.includes('juneau') || value.includes('skagway') || value.includes('ketchikan') || value.includes('alaska')) {
+    return openSourcePhotos.alaska
+  }
+
+  if (value.includes('bergen') || value.includes('geiranger') || value.includes('oslo') || value.includes('nordic')) {
+    return openSourcePhotos.nordic
+  }
+
+  if (value.includes('vancouver') || value.includes('san francisco') || value.includes('los angeles') || value.includes('pacific')) {
+    return openSourcePhotos.pacific
+  }
+
+  if (value.includes('lisbon') || value.includes('azores') || value.includes('bermuda') || value.includes('new york') || value.includes('transatlantic')) {
+    return openSourcePhotos.transatlantic
+  }
+
+  return openSourcePhotos.default
+}
+
 function goBack(): void {
   router.push('/')
+}
+
+function saveCruise(): void {
+  if (!cruise.value) {
+    return
+  }
+
+  const selectedCruise = cruise.value
+  const destination = selectedCruise.itineraryMap.split('->')[1]?.trim() ?? selectedCruise.itineraryName
+
+  const savedConfig: SavedCruiseConfig = {
+    id: `${selectedCruise.id}-${Date.now()}`,
+    cruiseId: selectedCruise.id,
+    itineraryName: selectedCruise.itineraryName,
+    itineraryMap: selectedCruise.itineraryMap,
+    shipName: selectedCruise.shipName,
+    startDate: selectedCruise.startDate,
+    endDate: selectedCruise.endDate,
+    nights: selectedCruise.nights,
+    imageUrl: destinationImage(destination),
+    staterooms: editableStaterooms.value.map((room) => ({
+      adults: room.adults,
+      children: room.children,
+      stateroomType: room.stateroomType,
+    })),
+    totalPrice: calculatedPricing.value.totalPrice,
+    pricePerStateroom: calculatedPricing.value.pricePerStateroom,
+    pricePerPerson: calculatedPricing.value.pricePerPerson,
+    savedAt: new Date().toISOString(),
+  }
+
+  addSavedCruise(savedConfig)
 }
 
 function continueToBooking(): void {
   router.push({
     name: 'booking-flow',
     query: {
-      cruiseId,
-      stateroomTypes: JSON.stringify(editableStaterooms.value.map((sr) => sr.type)),
+      cruiseId: selectedCruiseId.value,
+      stateroomTypes: JSON.stringify(editableStaterooms.value.map((sr) => sr.stateroomType)),
       adults: editableStaterooms.value.reduce((sum, sr) => sum + sr.adults, 0),
       children: editableStaterooms.value.reduce((sum, sr) => sum + sr.children, 0),
       totalPrice: calculatedPricing.value.totalPrice,
@@ -137,18 +322,35 @@ function continueToBooking(): void {
 </script>
 
 <template>
-  <v-container fluid class="pa-3 pa-sm-5 pa-md-8">
-    <v-card rounded="xl" elevation="2" class="surface-card">
-      <v-card-text class="pa-6">
-        <div class="d-flex align-center justify-space-between mb-6">
-          <h1 class="text-h5 font-weight-bold">Booking Summary</h1>
-          <v-btn icon="mdi-close" variant="text" @click="goBack" />
-        </div>
+  <v-container fluid class="booking-landing-page pa-3 pa-sm-5 pa-md-8">
+    <div class="booking-landing-header mb-6">
+      <v-btn color="secondary" variant="outlined" prepend-icon="mdi-arrow-left" @click="goBack">
+        Back to Search
+      </v-btn>
+    </div>
 
+    <v-card rounded="xl" elevation="4" class="booking-content-card">
+      <v-img
+        v-if="cruise"
+        :src="heroImageUrl"
+        height="260"
+        cover
+        class="booking-hero-image"
+      >
+        <div class="hero-overlay" />
+        <div class="hero-copy-wrap">
+          <div class="text-overline text-white mb-1">Selected Cruise</div>
+          <h2 class="text-h4 font-weight-black text-white mb-1">{{ cruise.itineraryName }}</h2>
+          <p class="text-body-2 text-white mb-0">{{ cruise.shipName }} • {{ formatDate(cruise.startDate) }} - {{ formatDate(cruise.endDate) }}</p>
+        </div>
+      </v-img>
+      <v-card-text class="pa-5 pa-sm-6">
         <v-divider class="mb-6" />
 
         <div v-if="cruise" class="mb-8">
-          <h2 class="text-h6 font-weight-bold mb-4">Cruise Details</h2>
+          <div class="d-flex align-center flex-wrap ga-2 mb-4">
+            <h2 class="text-h6 font-weight-bold mb-0">Cruise Details</h2>
+          </div>
           <v-row>
             <v-col cols="12" md="6">
               <div class="mb-4">
@@ -166,10 +368,16 @@ function continueToBooking(): void {
             </v-col>
             <v-col cols="12" md="6">
               <div class="mb-4">
-                <div class="text-body-2 text-medium-emphasis">Dates</div>
-                <div class="text-body-1 font-weight-medium">
-                  {{ formatDate(cruise.startDate) }} - {{ formatDate(cruise.endDate) }}
-                </div>
+                <div class="text-body-2 text-medium-emphasis mb-2">Sail Date</div>
+                <v-select
+                  v-model="selectedCruiseId"
+                  :items="sailDateOptions"
+                  item-title="title"
+                  item-value="value"
+                  variant="outlined"
+                  density="compact"
+                  hide-details
+                />
               </div>
               <div class="mb-4">
                 <div class="text-body-2 text-medium-emphasis">Duration</div>
@@ -184,110 +392,125 @@ function continueToBooking(): void {
           <v-row>
             <!-- Staterooms Accordion -->
             <v-col cols="12" md="7">
+              <div class="d-flex justify-space-between align-center mb-2">
+                <div class="text-subtitle-2">Staterooms</div>
+                <div class="d-flex ga-1">
+                  <v-btn
+                    icon="mdi-plus"
+                    size="x-small"
+                    variant="tonal"
+                    :disabled="stateroomCount >= 4"
+                    @click="addStateroom"
+                  />
+                </div>
+              </div>
+
               <v-expansion-panels variant="accordion">
                 <v-expansion-panel
                   v-for="(stateroom, index) in editableStaterooms"
                   :key="index"
+                  rounded="lg"
                 >
                   <template #title>
-                    <div class="d-flex justify-space-between w-100 align-center pr-2">
-                      <span>Stateroom {{ index + 1 }}: {{ stateroomTypeLabel(stateroom.type) }}</span>
-                      <span class="text-caption text-medium-emphasis">
-                        {{ stateroom.adults }} Adults, {{ stateroom.children }} Children
-                      </span>
+                    <div class="d-flex align-center justify-space-between w-100 ga-3">
+                      <div class="room-header-wrap">
+                        <span class="font-weight-medium">{{ formatStateroomLabel(stateroom, index) }}</span>
+                      </div>
+                      <v-btn
+                        icon="mdi-trash-can-outline"
+                        size="x-small"
+                        variant="text"
+                        color="secondary"
+                        :disabled="stateroomCount <= 1"
+                        :aria-label="`Remove stateroom ${index + 1}`"
+                        @click.stop="removeStateroom(index)"
+                      />
                     </div>
                   </template>
 
                   <v-card-text>
                     <div class="mb-4">
-                      <div class="text-body-2 text-medium-emphasis mb-2">Stateroom Type</div>
+                      <div class="text-body-2 font-weight-medium mb-2">Type</div>
                       <v-select
-                        v-model="stateroom.type"
-                        :items="['interior', 'oceanview', 'balcony', 'suite']"
-                        :item-props="(item: any) => ({ title: stateroomTypeLabel(item as keyof StateroomPricing) })"
+                        v-model="stateroom.stateroomType"
+                        :items="[
+                          { title: 'Interior', value: 'interior' },
+                          { title: 'Oceanview', value: 'oceanview' },
+                          { title: 'Balcony', value: 'balcony' },
+                          { title: 'Suite', value: 'suite' },
+                        ]"
                         density="compact"
                         variant="outlined"
                       />
                     </div>
 
-                    <div class="mb-4">
-                      <div class="text-body-2 text-medium-emphasis mb-2">Adults</div>
-                      <div class="d-flex align-center gap-2">
+                    <div class="d-flex justify-space-between align-center mb-3">
+                      <div>
+                        <div class="text-body-2 font-weight-medium">Adults</div>
+                        <div class="text-caption text-medium-emphasis">Ages 18+</div>
+                      </div>
+                      <div class="d-flex align-center ga-2">
                         <v-btn
                           icon="mdi-minus"
-                          size="small"
-                          variant="outlined"
+                          size="x-small"
+                          variant="tonal"
                           :disabled="stateroom.adults <= 1"
                           @click="decrementAdults(index)"
                         />
-                        <span class="text-body-1">{{ stateroom.adults }}</span>
+                        <strong>{{ stateroom.adults }}</strong>
                         <v-btn
                           icon="mdi-plus"
-                          size="small"
-                          variant="outlined"
+                          size="x-small"
+                          variant="tonal"
                           :disabled="stateroom.adults + stateroom.children >= 4"
                           @click="incrementAdults(index)"
                         />
                       </div>
                     </div>
 
-                    <div class="mb-4">
-                      <div class="text-body-2 text-medium-emphasis mb-2">Children</div>
-                      <div class="d-flex align-center gap-2">
+                    <div class="d-flex justify-space-between align-center">
+                      <div>
+                        <div class="text-body-2 font-weight-medium">Children</div>
+                        <div class="text-caption text-medium-emphasis">Under 18</div>
+                      </div>
+                      <div class="d-flex align-center ga-2">
                         <v-btn
                           icon="mdi-minus"
-                          size="small"
-                          variant="outlined"
+                          size="x-small"
+                          variant="tonal"
                           :disabled="stateroom.children <= 0"
                           @click="decrementChildren(index)"
                         />
-                        <span class="text-body-1">{{ stateroom.children }}</span>
+                        <strong>{{ stateroom.children }}</strong>
                         <v-btn
                           icon="mdi-plus"
-                          size="small"
-                          variant="outlined"
+                          size="x-small"
+                          variant="tonal"
                           :disabled="stateroom.adults + stateroom.children >= 4"
                           @click="incrementChildren(index)"
                         />
                       </div>
                     </div>
 
-                    <div class="text-body-2 mb-4">
-                      <span class="text-medium-emphasis">Price: </span>
-                      <span class="font-weight-bold">{{ formatCurrency(cruise && cruise.stateroomPricing ? cruise.stateroomPricing[stateroom.type] : 0) }}</span>
-                    </div>
+                    <p class="text-caption text-medium-emphasis mt-2 mb-0">Max 4 guests per stateroom and at least 1 adult.</p>
 
-                    <v-btn
-                      v-if="editableStaterooms.length > 1"
-                      size="small"
-                      color="error"
-                      variant="text"
-                      @click="removeStateroom(index)"
-                    >
-                      Remove Stateroom
-                    </v-btn>
+                    <div class="text-body-2 mt-3 mb-0">
+                      <span class="text-medium-emphasis">Price: </span>
+                      <span class="font-weight-bold">{{ formatCurrency(cruise && cruise.stateroomPricing ? cruise.stateroomPricing[stateroom.stateroomType] : 0) }}</span>
+                    </div>
                   </v-card-text>
                 </v-expansion-panel>
               </v-expansion-panels>
 
-              <v-btn
-                v-if="editableStaterooms.length < 4"
-                class="mt-4"
-                color="primary"
-                variant="text"
-                prepend-icon="mdi-plus"
-                @click="addStateroom"
-              >
-                Add Stateroom
-              </v-btn>
+              <p class="text-caption text-medium-emphasis mt-2 mb-0">{{ guestSummary }}</p>
             </v-col>
 
             <!-- Pricing Card -->
             <v-col cols="12" md="5">
-              <v-card variant="outlined" class="pa-4 sticky" style="top: 20px">
+              <v-card variant="outlined" class="pa-4 sticky pricing-card text-right" style="top: 20px">
                 <div class="mb-4">
                   <div class="text-body-2 text-medium-emphasis mb-1">Estimated Total</div>
-                  <div class="text-h4 font-weight-bold">{{ formatCurrency(calculatedPricing.totalPrice) }}</div>
+                  <div class="text-h4 font-weight-bold price-highlight">{{ formatCurrency(calculatedPricing.totalPrice) }}</div>
                 </div>
                 <div class="mb-2">
                   <div class="text-caption text-medium-emphasis">
@@ -316,11 +539,68 @@ function continueToBooking(): void {
 
         <v-divider class="mb-6" />
 
-        <div class="d-flex align-center justify-end gap-3">
-          <v-btn variant="text" @click="goBack">Back</v-btn>
-          <v-btn color="primary" variant="flat" @click="continueToBooking">Continue</v-btn>
+        <div class="d-flex align-center justify-space-between gap-3">
+          <v-btn variant="text" color="secondary" @click="goBack">Back</v-btn>
+          <div class="d-flex align-center ga-3">
+            <v-btn variant="outlined" color="secondary" @click="saveCruise">Save Cruise</v-btn>
+            <v-btn color="primary" variant="flat" @click="continueToBooking">Continue</v-btn>
+          </div>
         </div>
       </v-card-text>
     </v-card>
   </v-container>
 </template>
+
+<style scoped>
+.booking-landing-page {
+  min-height: 100vh;
+  background: #f7f9fc;
+}
+
+.booking-landing-header {
+  padding: 0;
+}
+
+.booking-content-card {
+  border: 1px solid rgba(11, 79, 138, 0.12);
+  background: rgba(255, 255, 255, 0.97);
+  overflow: hidden;
+}
+
+.booking-hero-image {
+  position: relative;
+}
+
+.hero-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(11, 53, 89, 0.5);
+}
+
+.hero-copy-wrap {
+  position: absolute;
+  left: 1rem;
+  right: 1rem;
+  bottom: 0.875rem;
+}
+
+.pricing-card {
+  border-color: rgba(11, 79, 138, 0.3) !important;
+  background: transparent;
+  color: #1f2937;
+}
+
+.pricing-card .text-medium-emphasis {
+  color: rgba(31, 41, 55, 0.78) !important;
+}
+
+.price-highlight {
+  color: #0b4f8a;
+}
+
+@media (min-width: 960px) {
+  .booking-landing-header {
+    padding: 0;
+  }
+}
+</style>

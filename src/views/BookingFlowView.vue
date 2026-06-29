@@ -66,6 +66,10 @@ function completeBooking(): void {
   router.push('/')
 }
 
+function cancelBooking(): void {
+  router.push('/')
+}
+
 const addOnCost = ref(0)
 
 function updateAddOnCost(): void {
@@ -77,12 +81,24 @@ function updateAddOnCost(): void {
 </script>
 
 <template>
-  <v-container fluid class="pa-3 pa-sm-5 pa-md-8">
-    <v-card rounded="xl" elevation="2" class="surface-card">
-      <v-card-text class="pa-6">
-        <div class="d-flex align-center justify-space-between mb-6">
-          <h1 class="text-h5 font-weight-bold">Booking Flow</h1>
-          <v-btn icon="mdi-close" variant="text" @click="router.push('/')" />
+  <v-container fluid class="booking-flow-page pa-3 pa-sm-5 pa-md-8">
+    <div class="booking-flow-header mb-6">
+      <div class="d-flex align-center justify-space-between flex-wrap ga-3">
+        <div>
+          <div class="text-overline text-white mb-1">Intrepid Cruise Lines</div>
+          <h1 class="text-h4 font-weight-bold text-white">Booking Flow</h1>
+          <p class="text-body-2 text-white mb-0">Personalize your cabin and complete your cruise booking.</p>
+        </div>
+        <v-btn color="white" variant="tonal" prepend-icon="mdi-arrow-left" @click="cancelBooking">Back to Search</v-btn>
+      </div>
+    </div>
+
+    <v-card rounded="xl" elevation="4" class="booking-flow-card">
+      <v-card-text class="pa-5 pa-sm-6">
+
+        <div class="d-flex align-center justify-space-between flex-wrap ga-2 mb-5">
+          <h2 class="text-h6 font-weight-bold mb-0">Plan Your Cruise Experience</h2>
+          <v-chip color="secondary" size="small" variant="flat">Secure Booking</v-chip>
         </div>
 
         <v-stepper v-model="currentStep" class="mb-6">
@@ -177,7 +193,7 @@ function updateAddOnCost(): void {
                       <v-divider class="my-3" />
                       <div>
                         <div class="text-body-2 text-medium-emphasis mb-1">Grand Total</div>
-                        <div class="text-h5 font-weight-bold text-primary">{{ formatCurrency(totalPrice + addOnCost) }}</div>
+                        <div class="text-h5 font-weight-bold total-highlight">{{ formatCurrency(totalPrice + addOnCost) }}</div>
                       </div>
                     </v-card>
                   </v-col>
@@ -193,12 +209,13 @@ function updateAddOnCost(): void {
           <v-btn
             :disabled="currentStep === 1"
             variant="text"
+            color="secondary"
             @click="previousStep"
           >
             Back
           </v-btn>
           <div class="d-flex ga-3">
-            <v-btn variant="text" @click="router.push('/')">Cancel</v-btn>
+            <v-btn variant="text" color="secondary" @click="cancelBooking">Cancel</v-btn>
             <v-btn
               v-if="currentStep < 3"
               color="primary"
@@ -221,3 +238,35 @@ function updateAddOnCost(): void {
     </v-card>
   </v-container>
 </template>
+
+<style scoped>
+.booking-flow-page {
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at 9% 14%, rgba(230, 126, 34, 0.2), transparent 34%),
+    radial-gradient(circle at 88% 10%, rgba(11, 79, 138, 0.18), transparent 31%),
+    linear-gradient(180deg, #eef6fc 0%, #f6fafe 58%, #ffffff 100%);
+}
+
+.booking-flow-header {
+  background: linear-gradient(125deg, #0b4f8a 0%, #164675 46%, #e67e22 100%);
+  border-radius: 20px;
+  padding: 1rem 1.25rem;
+  box-shadow: 0 14px 34px rgba(11, 79, 138, 0.24);
+}
+
+.booking-flow-card {
+  border: 1px solid rgba(11, 79, 138, 0.12);
+  background: rgba(255, 255, 255, 0.97);
+}
+
+.total-highlight {
+  color: #e67e22;
+}
+
+@media (min-width: 960px) {
+  .booking-flow-header {
+    padding: 1.25rem 1.5rem;
+  }
+}
+</style>
