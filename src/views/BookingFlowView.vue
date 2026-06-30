@@ -31,6 +31,8 @@ interface CabinOption {
   id: string
   label: string
   price: number
+  description: string
+  imageUrl: string
 }
 
 const stateroomTypeLabels: Record<StateroomType, string> = {
@@ -38,6 +40,13 @@ const stateroomTypeLabels: Record<StateroomType, string> = {
   oceanview: 'Oceanview',
   balcony: 'Balcony',
   suite: 'Suite',
+}
+
+const cabinTypeImages: Record<StateroomType, string> = {
+  interior: '/images/cabin-interior.svg',
+  oceanview: '/images/cabin-oceanview.svg',
+  balcony: '/images/cabin-balcony.svg',
+  suite: '/images/cabin-suite.svg',
 }
 
 const cabinVariantsByType: Record<StateroomType, Array<{ key: string; label: string; price: number }>> = {
@@ -135,11 +144,24 @@ function parseStateroomDetails(
 
 const bookingStaterooms = parseStateroomDetails(route.query.stateroomDetails, stateroomTypes, adults, children)
 
+function cabinDescription(stateroomType: StateroomType, variantLabel: string): string {
+  const typeDescriptionMap: Record<StateroomType, string> = {
+    interior: 'Smart layout and cozy design for value-focused cruising.',
+    oceanview: 'Natural light and sea-facing views for a brighter stay.',
+    balcony: 'Private outdoor space to unwind between destinations.',
+    suite: 'Premium space with upgraded comfort and exclusive touches.',
+  }
+
+  return `${variantLabel} option. ${typeDescriptionMap[stateroomType]}`
+}
+
 function getCabinOptionsForType(stateroomType: StateroomType): CabinOption[] {
   return cabinVariantsByType[stateroomType].map((variant) => ({
     id: `${stateroomType}-${variant.key}`,
     label: `${stateroomTypeLabels[stateroomType]} - ${variant.label}`,
     price: variant.price,
+    description: cabinDescription(stateroomType, variant.label),
+    imageUrl: cabinTypeImages[stateroomType],
   }))
 }
 
@@ -168,6 +190,16 @@ const cabinUpgradeCost = computed(() =>
     return sum + (selectedOption?.price ?? 0)
   }, 0),
 )
+const addOnCost = computed(() =>
+  selectedAddOns.value.reduce((sum, id) => {
+    const addOn = addOnOptions.find((opt) => opt.id === id)
+    return sum + (addOn?.price || 0)
+  }, 0),
+)
+const totalGuests = computed(() => Math.max(adults + children, 0))
+const runningTotalPrice = computed(() => totalPrice + cabinUpgradeCost.value + addOnCost.value)
+const runningPricePerStateroom = computed(() => (cabinStepCount > 0 ? runningTotalPrice.value / cabinStepCount : 0))
+const runningPricePerPerson = computed(() => (totalGuests.value > 0 ? runningTotalPrice.value / totalGuests.value : 0))
 
 const addOnOptions = [
   { id: 'beverage', label: 'Beverage Package', price: 200 },
@@ -225,19 +257,18 @@ function cancelBooking(): void {
   router.push('/')
 }
 
-const addOnCost = ref(0)
-
-function updateAddOnCost(): void {
-  addOnCost.value = selectedAddOns.value.reduce((sum, id) => {
-    const addOn = addOnOptions.find((opt) => opt.id === id)
-    return sum + (addOn?.price || 0)
-  }, 0)
-}
-
 function selectedCabinLabel(room: BookingStateroom, index: number): string {
   const selectedId = selectedCabinTypes.value[index]
   const selectedOption = getCabinOptionsForType(room.stateroomType).find((opt) => opt.id === selectedId)
   return selectedOption?.label ?? 'Not selected'
+}
+
+function selectCabin(index: number, optionId: string): void {
+  selectedCabinTypes.value[index] = optionId
+}
+
+function isCabinSelected(index: number, optionId: string): boolean {
+  return selectedCabinTypes.value[index] === optionId
 }
 </script>
 
@@ -301,18 +332,27 @@ function selectedCabinLabel(room: BookingStateroom, index: number): string {
                     {{ stateroom.adults }} Adults, {{ stateroom.children }} Children
                   </div>
                 </div>
-                <v-radio-group v-model="selectedCabinTypes[index]">
-                  <div v-for="option in getCabinOptionsForType(stateroom.stateroomType)" :key="option.id" class="mb-3">
-                    <v-radio :value="option.id">
-                      <template #label>
-                        <div class="d-flex justify-space-between w-100 ga-4">
-                          <span>{{ option.label }}</span>
-                          <span v-if="option.price > 0" class="text-medium-emphasis">{{ formatCurrency(option.price) }}</span>
+                <div class="cabin-option-grid">
+                  <v-card
+                    v-for="option in getCabinOptionsForType(stateroom.stateroomType)"
+                    :key="option.id"
+                    variant="flat"
+                    class="cabin-option-card"
+                    :class="{ 'cabin-option-card--selected': isCabinSelected(index, option.id) }"
+                    @click="selectCabin(index, option.id)"
+                  >
+                    <v-img :src="option.imageUrl" height="140" cover class="cabin-option-image" />
+                    <v-card-text>
+                      <div class="d-flex justify-space-between align-start ga-3 mb-2">
+                        <div class="text-body-1 font-weight-medium">{{ option.label }}</div>
+                        <div class="text-body-2 font-weight-bold">
+                          {{ option.price > 0 ? `+${formatCurrency(option.price)}` : 'Included' }}
                         </div>
-                      </template>
-                    </v-radio>
-                  </div>
-                </v-radio-group>
+                      </div>
+                      <p class="text-body-2 text-medium-emphasis mb-0">{{ option.description }}</p>
+                    </v-card-text>
+                  </v-card>
+                </div>
               </div>
             </v-stepper-window-item>
 
@@ -327,7 +367,6 @@ function selectedCabinLabel(room: BookingStateroom, index: number): string {
                     v-model="selectedAddOns"
                     :value="addOn.id"
                     class="mb-2"
-                    @update:model-value="updateAddOnCost"
                   >
                     <template #label>
                       <div class="d-flex justify-space-between w-100 ga-4">
@@ -388,7 +427,7 @@ function selectedCabinLabel(room: BookingStateroom, index: number): string {
                       <div>
                         <div class="text-body-2 text-medium-emphasis mb-1">Grand Total</div>
                         <div class="text-h5 font-weight-bold total-highlight">
-                          {{ formatCurrency(totalPrice + cabinUpgradeCost + addOnCost) }}
+                          {{ formatCurrency(runningTotalPrice) }}
                         </div>
                       </div>
                     </v-card>
@@ -398,6 +437,34 @@ function selectedCabinLabel(room: BookingStateroom, index: number): string {
             </v-stepper-window-item>
           </v-stepper-window>
         </v-stepper>
+
+        <div class="d-flex justify-end mb-6">
+          <v-card class="pa-4 pricing-card text-right running-price-card">
+            <div class="mb-4">
+              <div class="text-body-2 text-medium-emphasis mb-1">Total Price</div>
+              <div class="text-h4 font-weight-bold price-highlight">{{ formatCurrency(runningTotalPrice) }}</div>
+            </div>
+            <div class="mb-2 d-flex align-center justify-end ga-4 flex-wrap">
+              <div class="text-caption text-medium-emphasis">Staterooms: {{ cabinStepCount }}</div>
+              <div class="text-caption text-medium-emphasis">Total Guests: {{ totalGuests }}</div>
+            </div>
+            <div class="mb-2">
+              <div class="text-caption text-medium-emphasis">Base cruise: {{ formatCurrency(totalPrice) }}</div>
+            </div>
+            <div class="mb-2">
+              <div class="text-caption text-medium-emphasis">Cabin upgrades: {{ formatCurrency(cabinUpgradeCost) }}</div>
+            </div>
+            <div class="mb-2">
+              <div class="text-caption text-medium-emphasis">Add-ons: {{ formatCurrency(addOnCost) }}</div>
+            </div>
+            <div class="mb-2">
+              <div class="text-caption text-medium-emphasis">Price per stateroom: {{ formatCurrency(runningPricePerStateroom) }}</div>
+            </div>
+            <div>
+              <div class="text-caption text-medium-emphasis">Price per person: {{ formatCurrency(runningPricePerPerson) }}</div>
+            </div>
+          </v-card>
+        </div>
 
         <v-divider class="mb-6" />
 
@@ -453,6 +520,53 @@ function selectedCabinLabel(room: BookingStateroom, index: number): string {
 .booking-flow-card {
   border: 1px solid rgba(11, 79, 138, 0.12);
   background: rgba(255, 255, 255, 0.97);
+}
+
+.cabin-option-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.cabin-option-card {
+  border: 1px solid rgba(11, 79, 138, 0.2);
+  cursor: pointer;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.cabin-option-card:hover {
+  border-color: rgba(11, 79, 138, 0.45);
+  box-shadow: 0 8px 16px rgba(11, 79, 138, 0.12);
+  transform: translateY(-1px);
+}
+
+.cabin-option-card--selected {
+  border-color: #0b4f8a;
+  box-shadow: 0 10px 18px rgba(11, 79, 138, 0.16);
+}
+
+.cabin-option-image {
+  border-bottom: 1px solid rgba(11, 79, 138, 0.1);
+}
+
+.pricing-card {
+  border: none !important;
+  box-shadow: none !important;
+  background: transparent;
+  color: #1f2937;
+}
+
+.pricing-card .text-medium-emphasis {
+  color: rgba(31, 41, 55, 0.78) !important;
+}
+
+.price-highlight {
+  color: #0b4f8a;
+}
+
+.running-price-card {
+  width: 100%;
+  max-width: 420px;
 }
 
 .step-progress-mobile {

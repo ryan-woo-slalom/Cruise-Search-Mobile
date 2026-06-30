@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 450" role="img" aria-label="Interior cabin illustration">
+  <rect width="800" height="450" fill="#f4f7fb"/>
+  <rect x="0" y="0" width="800" height="90" fill="#d9e7f6"/>
+  <rect x="60" y="120" width="680" height="270" rx="18" fill="#ffffff" stroke="#d1d9e3"/>
+  <rect x="110" y="250" width="300" height="95" rx="14" fill="#dce6f2"/>
+  <rect x="110" y="250" width="300" height="50" rx="14" fill="#edf3fa"/>
+  <rect x="130" y="230" width="110" height="30" rx="8" fill="#c9d7e8"/>
+  <rect x="252" y="230" width="110" height="30" rx="8" fill="#c9d7e8"/>
+  <rect x="460" y="160" width="220" height="160" rx="12" fill="#e8f0fa" stroke="#c8d7ea"/>
+  <rect x="485" y="185" width="170" height="95" rx="8" fill="#a7c7e7"/>
+  <circle cx="570" cy="232" r="34" fill="#7fb0df"/>
+  <text x="60" y="70" font-family="Open Sans, Arial, sans-serif" font-size="34" fill="#0b4f8a" font-weight="700">Interior Cabin</text>
+</svg>

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useDisplay } from 'vuetify'
 import cruiseData from '../data/metrics.json'
@@ -31,9 +31,22 @@ type ItineraryGroup = {
   departures: CruiseDeparture[]
 }
 
+type PersistedHomeState = {
+  searchQuery: string
+  appliedSearchQuery: string
+  pricingMode: PricingMode
+  activeView: ViewMode
+  sortMode: SortMode
+  selectedMonths: string[]
+  selectedShips: string[]
+  priceRange: number[]
+  nightsRange: number[]
+}
+
 const cruises = cruiseData as CruiseDeparture[]
 const router = useRouter()
 const { mdAndUp } = useDisplay()
+const HOME_STATE_STORAGE_KEY = 'cruise-search-home-state-v1'
 
 const minPrice = Math.min(...cruises.map((cruise) => cruise.pricePerPerson))
 const maxPrice = Math.max(...cruises.map((cruise) => cruise.pricePerPerson))
@@ -752,6 +765,9 @@ function goToBookingLanding(): void {
   if (!quickViewSelectedCruise.value) {
     return
   }
+
+  saveHomeState()
+
   router.push({
     name: 'booking-landing',
     query: {
@@ -768,6 +784,8 @@ function goToBookingLanding(): void {
 
 function bookCruiseFromCard(cruise: CruiseDeparture): void {
   // Directly navigate to booking landing with default stateroom configuration
+  saveHomeState()
+
   router.push({
     name: 'booking-landing',
     query: {
@@ -813,6 +831,116 @@ const compareRows = computed(() => [
     values: compareCruises.value.map((cruise) => cruise.itineraryMap),
   },
 ])
+
+function saveHomeState(): void {
+  if (typeof window === 'undefined') {
+    return
+  }
+
+  const state: PersistedHomeState = {
+    searchQuery: searchQuery.value,
+    appliedSearchQuery: appliedSearchQuery.value,
+    pricingMode: pricingMode.value,
+    activeView: activeView.value,
+    sortMode: sortMode.value,
+    selectedMonths: [...selectedMonths.value],
+    selectedShips: [...selectedShips.value],
+    priceRange: [...priceRange.value],
+    nightsRange: [...nightsRange.value],
+  }
+
+  window.sessionStorage.setItem(HOME_STATE_STORAGE_KEY, JSON.stringify(state))
+}
+
+function restoreHomeState(): void {
+  if (typeof window === 'undefined') {
+    return
+  }
+
+  const raw = window.sessionStorage.getItem(HOME_STATE_STORAGE_KEY)
+  if (!raw) {
+    return
+  }
+
+  try {
+    const parsed = JSON.parse(raw) as Partial<PersistedHomeState>
+
+    if (typeof parsed.searchQuery === 'string') {
+      searchQuery.value = parsed.searchQuery
+    }
+
+    if (typeof parsed.appliedSearchQuery === 'string') {
+      appliedSearchQuery.value = parsed.appliedSearchQuery
+    }
+
+    if (parsed.pricingMode === 'person' || parsed.pricingMode === 'stateroom') {
+      pricingMode.value = parsed.pricingMode
+    }
+
+    if (parsed.activeView === 'itinerary' || parsed.activeView === 'date') {
+      activeView.value = parsed.activeView
+    }
+
+    if (
+      parsed.sortMode === 'recommended' ||
+      parsed.sortMode === 'highestRated' ||
+      parsed.sortMode === 'priceLowHigh' ||
+      parsed.sortMode === 'priceHighLow'
+    ) {
+      sortMode.value = parsed.sortMode
+    }
+
+    if (Array.isArray(parsed.selectedMonths)) {
+      selectedMonths.value = parsed.selectedMonths.filter((month): month is string => typeof month === 'string')
+    }
+
+    if (Array.isArray(parsed.selectedShips)) {
+      selectedShips.value = parsed.selectedShips.filter((ship): ship is string => typeof ship === 'string')
+    }
+
+    if (
+      Array.isArray(parsed.priceRange) &&
+      parsed.priceRange.length === 2 &&
+      parsed.priceRange.every((value) => typeof value === 'number')
+    ) {
+      const [restoredMinPrice = minPrice, restoredMaxPrice = maxPrice] = parsed.priceRange
+      priceRange.value = [restoredMinPrice, restoredMaxPrice]
+    }
+
+    if (
+      Array.isArray(parsed.nightsRange) &&
+      parsed.nightsRange.length === 2 &&
+      parsed.nightsRange.every((value) => typeof value === 'number')
+    ) {
+      const [restoredMinNights = minNights, restoredMaxNights = maxNights] = parsed.nightsRange
+      nightsRange.value = [restoredMinNights, restoredMaxNights]
+    }
+  } catch {
+    // Ignore invalid persisted state
+  }
+}
+
+onMounted(() => {
+  restoreHomeState()
+})
+
+watch(
+  [
+    searchQuery,
+    appliedSearchQuery,
+    pricingMode,
+    activeView,
+    sortMode,
+    selectedMonths,
+    selectedShips,
+    priceRange,
+    nightsRange,
+  ],
+  () => {
+    saveHomeState()
+  },
+  { deep: true },
+)
 </script>
 
 <template>

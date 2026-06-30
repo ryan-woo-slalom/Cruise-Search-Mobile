@@ -352,8 +352,6 @@ function continueToBooking(): void {
         </div>
       </v-img>
       <v-card-text class="pa-5 pa-sm-6">
-        <v-divider class="mb-6" />
-
         <div v-if="cruise" class="mb-8">
           <div class="d-flex align-center flex-wrap ga-2 mb-4">
             <h2 class="text-h6 font-weight-bold mb-0">Cruise Details</h2>
@@ -397,7 +395,7 @@ function continueToBooking(): void {
         <div class="mb-8">
           <h2 class="text-h6 font-weight-bold mb-4">Your Selection</h2>
           <v-row>
-            <!-- Staterooms Accordion -->
+            <!-- Staterooms Cards -->
             <v-col cols="12" md="7">
               <div class="d-flex justify-space-between align-center mb-2">
                 <div class="text-subtitle-2">Staterooms</div>
@@ -412,17 +410,17 @@ function continueToBooking(): void {
                 </div>
               </div>
 
-              <v-expansion-panels variant="accordion">
-                <v-expansion-panel
+              <div class="d-flex flex-column ga-3">
+                <v-card
                   v-for="(stateroom, index) in editableStaterooms"
                   :key="index"
                   rounded="lg"
+                  variant="outlined"
+                  class="stateroom-card"
                 >
-                  <template #title>
-                    <div class="d-flex align-center justify-space-between w-100 ga-3">
-                      <div class="room-header-wrap">
-                        <span class="font-weight-medium">{{ formatStateroomLabel(stateroom, index) }}</span>
-                      </div>
+                  <v-card-text>
+                    <div class="d-flex align-center justify-space-between w-100 ga-3 mb-3">
+                      <span class="font-weight-medium">{{ formatStateroomLabel(stateroom, index) }}</span>
                       <v-btn
                         icon="mdi-trash-can-outline"
                         size="x-small"
@@ -433,9 +431,6 @@ function continueToBooking(): void {
                         @click.stop="removeStateroom(index)"
                       />
                     </div>
-                  </template>
-
-                  <v-card-text>
                     <div class="mb-4">
                       <div class="text-body-2 font-weight-medium mb-2">Type</div>
                       <v-select
@@ -506,28 +501,22 @@ function continueToBooking(): void {
                       <span class="font-weight-bold">{{ formatCurrency(cruise && cruise.stateroomPricing ? cruise.stateroomPricing[stateroom.stateroomType] : 0) }}</span>
                     </div>
                   </v-card-text>
-                </v-expansion-panel>
-              </v-expansion-panels>
+                </v-card>
+              </div>
 
               <p class="text-caption text-medium-emphasis mt-2 mb-0">{{ guestSummary }}</p>
             </v-col>
 
             <!-- Pricing Card -->
             <v-col cols="12" md="5">
-              <v-card variant="outlined" class="pa-4 sticky pricing-card text-right" style="top: 20px">
+              <v-card class="pa-4 sticky pricing-card text-right" style="top: 20px">
                 <div class="mb-4">
-                  <div class="text-body-2 text-medium-emphasis mb-1">Estimated Total</div>
+                  <div class="text-body-2 text-medium-emphasis mb-1">Total Price</div>
                   <div class="text-h4 font-weight-bold price-highlight">{{ formatCurrency(calculatedPricing.totalPrice) }}</div>
                 </div>
-                <div class="mb-2">
-                  <div class="text-caption text-medium-emphasis">
-                    Staterooms: {{ editableStaterooms.length }}
-                  </div>
-                </div>
-                <div class="mb-2">
-                  <div class="text-caption text-medium-emphasis">
-                    Total Guests: {{ calculatedPricing.totalGuests }}
-                  </div>
+                <div class="mb-2 d-flex align-center justify-end ga-4 flex-wrap">
+                  <div class="text-caption text-medium-emphasis">Staterooms: {{ editableStaterooms.length }}</div>
+                  <div class="text-caption text-medium-emphasis">Total Guests: {{ calculatedPricing.totalGuests }}</div>
                 </div>
                 <div class="mb-2">
                   <div class="text-caption text-medium-emphasis">
@@ -592,7 +581,8 @@ function continueToBooking(): void {
 }
 
 .pricing-card {
-  border-color: rgba(11, 79, 138, 0.3) !important;
+  border: none !important;
+  box-shadow: none !important;
   background: transparent;
   color: #1f2937;
 }

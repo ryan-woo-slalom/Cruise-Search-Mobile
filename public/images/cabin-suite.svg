@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 450" role="img" aria-label="Suite cabin illustration">
+  <rect width="800" height="450" fill="#f8f8fd"/>
+  <rect x="0" y="0" width="800" height="90" fill="#e2def7"/>
+  <rect x="45" y="110" width="710" height="290" rx="20" fill="#ffffff" stroke="#d8d5eb"/>
+  <rect x="90" y="238" width="285" height="108" rx="14" fill="#e5e1f4"/>
+  <rect x="90" y="238" width="285" height="52" rx="14" fill="#f0eef9"/>
+  <rect x="116" y="217" width="104" height="30" rx="8" fill="#d0c8eb"/>
+  <rect x="232" y="217" width="104" height="30" rx="8" fill="#d0c8eb"/>
+  <rect x="415" y="165" width="300" height="170" rx="12" fill="#f3f0fb" stroke="#d0c8ea"/>
+  <rect x="440" y="190" width="250" height="95" rx="10" fill="#b9afe2"/>
+  <circle cx="520" cy="285" r="10" fill="#f7d07a"/>
+  <circle cx="560" cy="285" r="10" fill="#f7d07a"/>
+  <circle cx="600" cy="285" r="10" fill="#f7d07a"/>
+  <text x="60" y="70" font-family="Open Sans, Arial, sans-serif" font-size="34" fill="#0b4f8a" font-weight="700">Suite Cabin</text>
+</svg>

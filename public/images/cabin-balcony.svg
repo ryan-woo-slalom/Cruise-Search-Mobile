@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 450" role="img" aria-label="Balcony cabin illustration">
+  <rect width="800" height="450" fill="#f5f9ff"/>
+  <rect x="0" y="0" width="800" height="90" fill="#d6e8fb"/>
+  <rect x="60" y="120" width="680" height="270" rx="18" fill="#ffffff" stroke="#d1d9e3"/>
+  <rect x="100" y="245" width="260" height="100" rx="14" fill="#dce6f2"/>
+  <rect x="100" y="245" width="260" height="52" rx="14" fill="#edf3fa"/>
+  <rect x="125" y="225" width="95" height="30" rx="8" fill="#c9d7e8"/>
+  <rect x="232" y="225" width="95" height="30" rx="8" fill="#c9d7e8"/>
+  <rect x="410" y="145" width="270" height="210" rx="12" fill="#eef4fb" stroke="#c6d8ec"/>
+  <rect x="430" y="165" width="230" height="125" rx="10" fill="#8abbe7"/>
+  <path d="M430 258 Q488 220 545 258 Q602 220 660 258" fill="#5b9fd8"/>
+  <rect x="410" y="305" width="270" height="8" fill="#93b6d7"/>
+  <rect x="410" y="326" width="270" height="8" fill="#93b6d7"/>
+  <text x="60" y="70" font-family="Open Sans, Arial, sans-serif" font-size="34" fill="#0b4f8a" font-weight="700">Balcony Cabin</text>
+</svg>

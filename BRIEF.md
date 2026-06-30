@@ -128,7 +128,10 @@ Comprehensive fake dataset as a JSON file (src/data/metrics.json) with 77 cruise
     - Cabin type: each selected stateroom gets its own cabin-selection step
     - Cabin options are filtered by stateroom type (for example, Interior only shows Interior variants)
     - Each cabin step shows selected stateroom details (type, adults, children)
-        - Cruise add-ons
+  - Cruise add-ons
+  - Cabin options are displayed as stacked selectable cards with cabin details and cabin-specific images
+  - Contains a running price summary at the bottom of the page in the same visual style as Booking Landing pricing
+  - Running total updates live and includes Booking Flow selections (cabin upgrades and add-ons)
    
 ### Footer
 - Footer on bottom
@@ -180,7 +183,7 @@ The application has been set up with Vue Router (v4) with the following routes:
     - Selecting a new date switches the active departure on Booking Landing
     - Duration and date-dependent pricing update immediately when date changes
   - **Editable Stateroom Configuration**:
-    - Accordion interface for each stateroom (min 1, max 4)
+    - Separate card interface for each stateroom (min 1, max 4)
     - Add/Remove stateroom buttons (+/- controls with 1-4 stateroom limit)
     - For each stateroom:
       - Type selector dropdown (Interior, Oceanview, Balcony, Suite)
@@ -188,12 +191,17 @@ The application has been set up with Vue Router (v4) with the following routes:
       - Children count with +/- buttons (min 0, max based on room capacity)
       - Price display per stateroom type
     - Remove button per stateroom (disabled if only 1 stateroom remains)
+    - No collapse/expand affordance on stateroom cards
   - Dynamic pricing recalculation as users modify selections:
     - Date change recalculates total based on the selected departure's stateroom pricing
     - Total cruise price across all staterooms
     - Price per stateroom (total price ÷ number of staterooms)
     - Price per person (total price ÷ total guests)
   - Pricing card with breakdown displayed on right side (sticky positioning)
+    - No card outline
+    - Primary total label is "Total Price"
+    - "Staterooms" and "Total Guests" are shown on the same line
+  - Removed horizontal divider above the "Cruise Details" section
   - Save Cruise button stores the currently selected departure and stateroom configuration in Saved Cruises
   - Navigation: Back button (left-aligned, returns to home), Save Cruise and Continue buttons on right (Continue proceeds to booking flow with updated values and full stateroom details)
   - Stateroom type label formatter for display (interior → "Interior", etc.)
@@ -212,6 +220,8 @@ The application has been set up with Vue Router (v4) with the following routes:
     - Stateroom index (for example, Stateroom 2 of 3)
     - Stateroom type label
     - Adults and children counts
+  - Cabin variants are presented as vertically stacked selectable cards
+    - Each card includes cabin label, price impact, supporting description, and cabin-specific image
   - Responsive step progress indicator:
     - Desktop uses stepper header
     - Mobile uses compact "Step X of Y" text + progress bar
@@ -219,6 +229,12 @@ The application has been set up with Vue Router (v4) with the following routes:
     - Add-on selections recalculate add-on total in real-time
     - Cabin upgrade selections calculate cabin upgrade total
     - Review step grand total includes base cruise + cabin upgrades + add-ons
+    - Bottom running pricing card mirrors Booking Landing style and includes:
+      - Total Price
+      - Stateroom and guest counts
+      - Base cruise, cabin upgrades, and add-ons line items
+      - Price per stateroom and price per person
+    - All Booking Flow selections immediately update the running bottom total and per-unit breakdown
   - Query parameter parsing to restore user's cruise, stateroom selections, and pricing selection
   - Navigation: Back button returns to Booking Landing with original query context, Cancel exits flow
   - Complete Booking button on final step (returns to home upon completion)
@@ -241,3 +257,6 @@ The application has been set up with Vue Router (v4) with the following routes:
 - Updated both ResultCard instances (itinerary and date views) with @book listener
 - Quick View "Book Now" button calls goToBookingLanding() with full stateroom configuration
 - Result card "Book Now" buttons navigate directly with default configuration (1 interior stateroom, 2 adults)
+- Cruise Search state persistence when returning from Booking Landing:
+  - Restores View by, Pricing by, Sort by, Search text, and applied filters/ranges
+  - Uses sessionStorage to preserve in-session state across route navigation
